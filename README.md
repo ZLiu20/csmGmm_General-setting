@@ -1,6 +1,6 @@
-# csmGmm_reproduce for the general setting
+# csmGmm_reproduce for the general multiple testing
 
-Code to reproduce simulation results, figures, and real data analysis results for general composite test.
+Code to reproduce simulation results, figures, and real data analysis results for general composite null hypotheses.
 
 ## Overview
 
