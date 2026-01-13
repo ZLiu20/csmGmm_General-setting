@@ -1,0 +1,14 @@
+#BSUB -J Fig6A[1041-1441]
+#BSUB -W 20:00
+#BSUB -o /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig6/errDir/Fig6A_log%I.out
+#BSUB -e /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig6/errDir/Fig6A_%I.err
+#BSUB –cwd /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/
+#BSUB -q medium
+#BSUB -u ZLiu20@mdanderson.org
+#BSUB -n 4
+#BSUB -M 32
+#BSUB -R rusage[mem=4]
+
+# run 400-600
+module load R/4.5.1
+Rscript /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig6/Fig6A_sim.R $LSB_JOBINDEX 1 >/rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig6/errDir/Fig6A_$LSB_JOBINDEX.out
