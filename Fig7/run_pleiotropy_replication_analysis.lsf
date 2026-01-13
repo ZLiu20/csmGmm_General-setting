@@ -1,0 +1,14 @@
+#BSUB -J ukbanalysis[1-2]
+#BSUB -W 3:00
+#BSUB -o /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig4/errDir/Fig4_data_log%I.out
+#BSUB -e /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig4/errDir/Fig4_data_%I.err
+#BSUB –cwd /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/
+#BSUB -q short
+#BSUB -u ZLiu20@mdanderson.org
+#BSUB -n 1
+#BSUB -M 64
+#BSUB -R rusage[mem=64]
+
+# run 1-9
+module load R/4.5.1
+Rscript /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig4/ukb_analysis_R1.R $LSB_JOBINDEX 1 >/rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig4/errDir/Fig4_data_$LSB_JOBINDEX.out
