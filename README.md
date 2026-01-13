@@ -1,6 +1,6 @@
 # csmGmm_reproduce for the general setting
 
-Code to reproduce simulation results, figures, and real data analysis results from the paper "Testing a Large Number of Composite Null Hypotheses Using Conditionally Symmetric Multidimensional Gaussian Mixtures in Genome-Wide Studies" by Ryan Sun, Zachary McCaw, and Xihong Lin.
+Code to reproduce simulation results, figures, and real data analysis results for general composite test.
 
 ## Overview
 
