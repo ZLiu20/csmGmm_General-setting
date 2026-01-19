@@ -24,7 +24,7 @@ purrr::map(paste0(codePath, "/", toBeSourced), source)
 outputDir <- here::here("Fig2", "output")
 
 ##output
-names2a <- here::here(outputDir, paste0("Fig7A_aID", 1:841, ".txt"))
+names2a <- here::here(outputDir, paste0("Fig7A_aID", 120:780, ".txt"))
 names2b <- here::here(outputDir, paste0("Fig7B_aID", 1:400, ".txt"))
 
 
@@ -131,7 +131,7 @@ Fig2B_plot <- ggplot(data=Fig2B_data, aes(x=minEff1, y=FDP, group=Method)) +
   ylab("FDP (4D Mediationn)") +
   xlab("Min Effect Magnitude") +
   ylim(c(0, 0.3)) + #xlim(c(0.02, 0.11)) +
-  xlab(expression(paste(tau[1] ,"= Proportion of (", alpha[j] != 0, ", ", beta[j], "=0, ", gamma[j], "=0)"))) +
+  xlab(expression(paste(tau[1] ,"= Proportion of (", alpha[j] != 0, ", ", beta[j], "=0, ", gamma[j], "=0,", delta[j], "=0)"))) +
   theme_cowplot() +
   theme(axis.title = element_text(size=20), axis.text = element_text(size=16)) +
   theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
@@ -147,7 +147,7 @@ Fig2D_plot <- ggplot(data=Fig2B_data, aes(x=minEff1, y=Power, group=Method)) +
   ylab("Power (4D Mediation)") +
   xlab("Min Effect Magnitude") +
   ylim(c(0, 1.0)) + #xlim(c(0.02, 0.11)) +
-  xlab(expression(paste(tau[1] ,"= Proportion of (", alpha[j] != 0, ", ", beta[j], "=0, ", gamma[j], "=0)"))) +
+  xlab(expression(paste(tau[1] ,"= Proportion of (", alpha[j] != 0, ", ", beta[j], "=0, ", gamma[j], "=0,", delta[j], "=0)"))) +
   theme_cowplot() +
   theme(axis.title = element_text(size=20), axis.text = element_text(size=16)) +
   theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
