@@ -428,11 +428,9 @@ effSizeMult <- ceiling(aID / simsPerEffSize)
 # betaMin <- c(0.00 + 0.01 * effSizeMult, 0.1 + 0.01 * effSizeMult, 0.00 + 0.01 * effSizeMult, 0.1 + 0.01 * effSizeMult)
 # betaMax <- c(0.04 + 0.01 * effSizeMult, 0.14 + 0.01 * effSizeMult, 0.04 + 0.01 * effSizeMult, 0.14 + 0.01 * effSizeMult)
 
-# betaMin <- c(0.14 + 0.01 * effSizeMult, 0.14 + 0.01 * effSizeMult, 0.14 + 0.01 * effSizeMult)
-# betaMax <- c(0.24 + 0.01 * effSizeMult, 0.24 + 0.01 * effSizeMult, 0.24 + 0.01 * effSizeMult)
+betaMin <- c(0.0 + 0.01 * effSizeMult, 0.14 + 0.01 * effSizeMult, 0.0 + 0.01 * effSizeMult, 0.14 + 0.01 * effSizeMult)
+betaMax <- c(0.18 + 0.01 * effSizeMult, 0.24 + 0.01 * effSizeMult, 0.18 + 0.01 * effSizeMult, 0.24 + 0.01 * effSizeMult)
 
-betaMin <- rep(0.20 + 0.01 * effSizeMult, nDims)
-betaMax <- rep(0.24 + 0.01 * effSizeMult, nDims)
 
 beta0 <- -1
 
