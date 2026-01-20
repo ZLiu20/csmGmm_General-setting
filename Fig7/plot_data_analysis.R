@@ -121,37 +121,26 @@ for (chr_it in 1:22) {
 }
 
 # data for manhattan plot - 2 way pleiotropy
-manDataTwo <- rbind(s1new %>% select(chrpos, Chr, BP, newLfdr) %>% mutate(cat = "Pleiotropy"),
-                 s2new %>% select(chrpos, Chr, BP, newLfdr) %>% mutate(cat = "Replication")) %>%
-  as.data.frame(.) %>%
-  mutate(Chr = as.numeric(Chr), BP = as.numeric(BP)) %>%
-  arrange(newLfdr) %>%
-  # distinct() keeps the first one, so we arrange first
-  distinct(., chrpos, .keep_all = TRUE)
-
-manPlotTwo <- plotManhattan(plotRes = manDataTwo, chrCounts,
-                            colValues = gg_color_hue(3), shapeValues=c(8,16,17), ylimits=c(0, 12.5), legName="Pleiotropy+Replication")
-manPlotTwo
-
-
-# data for manhattan plot - replication
-manDataRep <- rbind(s1new %>% select(Chr, BP, chrpos, newLfdr) %>% mutate(pheno = "CAD"),
-                    s2new %>% select(Chr, BP, chrpos, newLfdr) %>% mutate(pheno = "LC")) %>%
+# data for manhattan plot - Pleiotropy & replication
+manDataRep <- rbind(s1new %>% select(Chr, BP, chrpos, newLfdr) %>% mutate(pheno = "Pleiotropy"),
+                    s2new %>% select(Chr, BP, chrpos, newLfdr) %>% mutate(pheno = "Replication")) %>%
   as.data.frame(.) %>%
   mutate(Chr = as.numeric(Chr), BP = as.numeric(BP)) %>%
   # overlap with LC, CAD pleiotropy
   mutate(Pleio = ifelse(chrpos %in% s1new$chrpos, 1, 0)) %>%
   mutate(Rep = ifelse(chrpos %in% s2new$chrpos, 1, 0)) %>%
-  mutate(cat = ifelse(Pleio == 1 & Rep == 1, "Pleio + Rep", "Rep Only")) %>%
-  mutate(cat = ifelse(Pleio == 1 & Rep == 0, "Pleio Only", cat)) %>%  
+  mutate(cat = ifelse(Pleio == 1, "Pleiotropy (CAD,BMI,LC)","Replication (ILCCO, UKB, MVP)")) %>%
   arrange(pheno) %>%
   # distinct() keeps the first one, so we arrange first - want to show Pleio lfdr if in pleio
   distinct(., chrpos, .keep_all = TRUE)
 
 manPlotRep <- plotManhattan(plotRes = manDataRep, chrCounts,
-                            colValues=c(gg_color_hue(3)[3], "black", "darkorange"), shapeValues=c(17, 18, 15),
-                            ylimits=c(0, 12.5), legName="Lung Cancer")
-manPlotRep
+                            colValues=c(gg_color_hue(3)[3], "darkorange"), shapeValues=c(17, 18),
+                            ylimits=c(0, 6.5), legName="Pleiotropy & Replication")
+manPlotTwo
+
+ggsave(paste0(outputDir, "/Fig_Pleiotropy.pdf"), width=18, height=8)
+
 
 #----------------------------------------------------------------------------#
 # Table 2
