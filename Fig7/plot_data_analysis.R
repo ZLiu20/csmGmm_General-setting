@@ -161,8 +161,8 @@ adjAnal <- fread(here::here(outputDir, "processed_ukb_data_S1.txt"))
 origAnal <- fread(here::here(outputDir, "processed_ukb_data_S2.txt"))
 
 tab2 <- origAnal %>% filter(aID == 1) %>% select(Method, numReject) %>%
-  mutate(a1 = origAnal %>% filter(aID == 2) %>% select(numReject) %>% unlist(.)) %>%
-  mutate(a1new = adjAnal %>% filter(aID == 1) %>% select(numReject) %>% unlist(.)) %>%
+  mutate(a1 = adjAnal %>% filter(aID == 1) %>% select(numReject) %>% unlist(.)) %>%
+  mutate(a1new = origAnal %>% filter(aID == 2) %>% select(numReject) %>% unlist(.)) %>%
   mutate(a2new = adjAnal %>% filter(aID == 2) %>% select(numReject) %>% unlist(.)) 
 
 tab2final <- tab2 %>%
