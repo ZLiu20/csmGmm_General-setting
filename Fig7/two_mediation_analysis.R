@@ -413,16 +413,29 @@ for (snp_it in 1:nrow(tab2DF)) {
   
   
   # adjustment to not get p-values of 0 needed for DACT and HDMT and our own methods
+  # for (col_it in 1:(ncol(allZ))) {
+  #   tooBig <- which(allZ[, col_it] > 1.35)
+  #   tooSmall <- which(allZ[, col_it] < -1.35)
+  #   if (length(tooBig) > 0) {
+  #     allZ[tooBig, col_it] <- 1.35
+  #   }
+  #   if (length(tooSmall) > 0) {
+  #     allZ[tooSmall, col_it] <- -1.35
+  #   }
+  # }
+  
   for (col_it in 1:(ncol(allZ))) {
-    tooBig <- which(allZ[, col_it] > 1.35)
-    tooSmall <- which(allZ[, col_it] < -1.35)
+    tooBig <- which(allZ[, col_it] > 8.1)
+    tooSmall <- which(allZ[, col_it] < -8.1)
     if (length(tooBig) > 0) {
-      allZ[tooBig, col_it] <- 1.35
+      allZ[tooBig, col_it] <- 8.1
     }
     if (length(tooSmall) > 0) {
-      allZ[tooSmall, col_it] <- -1.35
+      allZ[tooSmall, col_it] <- -8.1
     }
   }
+  
+  
   # for (col_it in ((ncol(allZ)/2)+1):ncol(allZ)) {
   #   tooBig <- which(allZ[, col_it] == 1)
   #   tooSmall <- which(allZ[, col_it] == 0)
@@ -505,15 +518,24 @@ for (snp_it in 1:nrow(tab2DF)) {
   # initMuList <- list(matrix(data=0, nrow=2, ncol=1), matrix(data=c(0, 3, 0, 6), nrow=2),
   #                    matrix(data=c(3, 0, 6, 0), nrow=2), matrix(data=c(8, 8), nrow=2))
   
+  # initPiList <- list(c(0.82))
+  # for (i in 2:(2^4-1)) {initPiList[[i]] <- c(0.08 / 28, 0.08 / 28)}
+  # initPiList[[2^4]] <- c(0.1)
+  # # the symm_fit_ind.R code will add the appropriate 0s to initMuList
+  # initMuList <- list(matrix(data=0, nrow=4, ncol=1))
+  # for (i in 2:(2^4-1)) {
+  #   initMuList[[i]] <- cbind(rep(2, 4), rep(5, 4))
+  # }
+  # initMuList[[2^4]] <- matrix(data=c(8, 8, 8, 8), nrow=4)
+  
   initPiList <- list(c(0.82))
-  for (i in 2:(2^4-1)) {initPiList[[i]] <- c(0.08 / 28, 0.08 / 28)}
-  initPiList[[2^4]] <- c(0.1)
+  for (i in 2:(2^4)) {initPiList[[i]] <- 0.18 / (2^4 - 1)}
   # the symm_fit_ind.R code will add the appropriate 0s to initMuList
-  initMuList <- list(matrix(data=0, nrow=4, ncol=1))
-  for (i in 2:(2^4-1)) {
-    initMuList[[i]] <- cbind(rep(5, 4), rep(5, 4))
+  initMuList <- list(matrix(data=rep(0, 4), nrow=4, ncol=1))
+  for (i in 2:(2^4)) {
+    initMuList[[i]] <- matrix(data=rep(3, 4), nrow=4, ncol=1)
   }
-  initMuList[[2^4]] <- matrix(data=c(8, 8, 8, 8), nrow=4)
+  
   
   #newRes <- symm_fit_ind_EM(testStats = testDat[, 1:2], sameDirAlt = FALSE, initMuList = initMuList, initPiList = initPiList, eps=newEps)
   
