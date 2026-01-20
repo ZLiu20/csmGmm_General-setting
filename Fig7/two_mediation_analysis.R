@@ -2,10 +2,10 @@
 
 # Using the here package to manage file paths. If an error is thrown, please
 # set the working directory to the folder that holds this Rscript, e.g.
-# setwd("/path/to/csmGmm_reproduce/Fig4/mediation_analysis.R") or set the path after the -cwd flag
+# setwd("/path/to/csmGmm_reproduce/Fig7/mediation_analysis.R") or set the path after the -cwd flag
 # in the .lsf file, and then run again.
-# setwd("~/Downloads/csmGmm_sim_R3/Fig4")
-here::i_am("Fig4/two_mediation_analysis.R")
+# setwd("~/Downloads/csmGmm_sim_R3/Fig7")
+here::i_am("Fig7/two_mediation_analysis.R")
 
 # load libraries
 library(mvtnorm)
@@ -326,15 +326,13 @@ args <- commandArgs(trailingOnly=TRUE)
 aID <- as.numeric(args[1])
 Snum <- as.numeric(args[2])
 
-# aID <- 14
-
 # source the .R scripts from the SupportingCode/ folder 
 codePath <- c(here::here("SupportingCode"))
 toBeSourced <- list.files(codePath, "\\.R$")
 purrr::map(paste0(codePath, "/", toBeSourced), source)
 
 # set output directory 
-outputDir <- here::here("Fig4", "output1")
+outputDir <- here::here("Fig7", "output")
 outRoot <- paste0(outputDir, "/med_analysis_aID", aID)
 
 # additional data needed
