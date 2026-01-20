@@ -53,7 +53,7 @@ define_H_space_R1 <- function(K,t) {
   H_annot[which(
     apply(abs(H_space), 1, sum) > t &
       apply(abs(H_space), 1, sum) <= K & 
-      apply(H_space, 1, sum) == abs(apply(sign(H_space), 1, sum))
+      apply(abs(H_space), 1, sum) == abs(apply(sign(H_space), 1, sum))
   )] <- 1  
   
   return( list(H_space=H_space, H_annot=H_annot) )
