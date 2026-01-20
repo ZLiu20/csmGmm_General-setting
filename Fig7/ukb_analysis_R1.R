@@ -37,7 +37,7 @@ find_max_means_R1 <- function(muInfo) {
 
 
 ################################################################################
-define_H_space_R1 <- function(K,t) {
+define_H_space_R1 <- function(K,t,sameDirAlt=FALSE) {
   H_space <- expand.grid( rep(list(c(-1,0,1)), K) )
   s <- rep(0, nrow(H_space))
   for (col_it in 1:ncol(H_space)) {
@@ -49,12 +49,16 @@ define_H_space_R1 <- function(K,t) {
     as.matrix(.)
   
   H_annot <- rep(0, nrow(H_space))
+  if (sameDirAlt) {
   # H_annot[which(apply(abs(H_space), 1, sum) == K)] <- 1
   H_annot[which(
     apply(abs(H_space), 1, sum) > t &
       apply(abs(H_space), 1, sum) <= K & 
-      apply(abs(H_space), 1, sum) == abs(apply(sign(H_space), 1, sum))
-  )] <- 1  
+      apply(abs(H_space), 1, sum) == abs(apply(sign(H_space), 1, sum)) )] <- 1  
+  } else { 
+      H_annot[which(
+        apply(abs(H_space), 1, sum) >t & apply(abs(H_space), 1, sum) <= K )] <- 1
+  }
   
   return( list(H_space=H_space, H_annot=H_annot) )
 }
@@ -64,7 +68,7 @@ define_H_space_R1 <- function(K,t) {
 ################################################################################
 emp_bayes_framework_R1 <- function(t_value, summary_tab, sameDirAlt=FALSE, nulltype=1, kernel=TRUE, joint=FALSE, ind=TRUE, dfFit=7, Hdist_epsilon=10^(-2), checkpoint=TRUE) {
   # Step 1 
-  H_space_output <- define_H_space_R1(K = ncol(summary_tab), t = t_value)
+  H_space_output <- define_H_space_R1(K = ncol(summary_tab), t = t_value, sameDirAlt = sameDirAlt)
   H_space <- as.matrix(H_space_output$H_space)
   H_annot <- H_space_output$H_annot
   if (sameDirAlt) {
