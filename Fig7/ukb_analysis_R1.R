@@ -2,9 +2,9 @@
 
 # Using the here package to manage file paths. If an error is thrown, please
 # set the working directory to the folder that holds this Rscript, e.g.
-# setwd("/path/to/csmGmm_reproduce/Fig1/Fig1A_sim.R") or set the path after the -cwd flag
+# setwd("/path/to/csmGmm_reproduce/Fig7/Fig1A_sim.R") or set the path after the -cwd flag
 # in the .lsf file, and then run again.
-here::i_am("Fig4/ukb_analysis_R1.R")
+here::i_am("Fig7/ukb_analysis_R1.R")
 
 # load libraries
 library(dplyr)
@@ -371,7 +371,6 @@ check_incongruous_R1 <- function(zMatrix, lfdrVec, t_value) {
 ################################################################################
 
 
-
 # record input - controls seed, parameters, etc.
 args <- commandArgs(trailingOnly=TRUE)
 aID <- as.numeric(args[1])
@@ -383,8 +382,8 @@ toBeSourced <- list.files(codePath, "\\.R$")
 purrr::map(paste0(codePath, "/", toBeSourced), source)
 
 # set output directory 
-outputDir <- here::here("Fig4", "output")
-fnameRoot <- paste0(outputDir, "/Fig4_data_aID", aID)
+outputDir <- here::here("Fig7", "output")
+fnameRoot <- paste0(outputDir, "/Fig7_data_aID", aID)
 
 # where is the data
 summaryStatDir <- here::here("Data")
