@@ -2,9 +2,9 @@
 
 # Using the here package to manage file paths. If an error is thrown, please
 # set the working directory to the folder that holds this Rscript, e.g.
-# setwd("/path/to/csmGmm_reproduce/Fig4/summarize_ukb_analysis.R") or set the path after the -cwd flag
+# setwd("/path/to/csmGmm_reproduce/Fig7/summarize_ukb_analysis.R") or set the path after the -cwd flag
 # in the .lsf file, and then run again.
-here::i_am("Fig4/summarize_ukb_analysis_R1.R")
+here::i_am("Fig7/summarize_ukb_analysis_R1.R")
 
 # load libraries
 library(data.table)
@@ -25,7 +25,7 @@ toBeSourced <- list.files(codePath, "\\.R$")
 purrr::map(paste0(codePath, "/", toBeSourced), source)
 
 # set output directory 
-outputDir <- here::here("Fig4", "output")
+outputDir <- here::here("Fig7", "output")
 dataDir <- here::here("Data")
 fnameOut <- paste0(outputDir, "/processed_ukb_data_S", Snum, ".txt")
 rejectFnameRoot <- paste0(outputDir, "/reject_bmi_with_overall_neg5_reject_S_", Snum)
