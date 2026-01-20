@@ -395,7 +395,7 @@ newEps <- 10^(-3)
 
 # controls which analysis to perform
 replication <- FALSE
-threeway <- FALSE
+pleiotropy <- FALSE
 
 doKernel <- TRUE
 do50df <- TRUE
@@ -404,12 +404,14 @@ do7df <- TRUE
 t <- 1
 if (aID == 1) {
   # three way - overall, cad, bmi
-  threeway <- TRUE
+  pleiotropy <- TRUE
+  replication <- FALSE
   cleanUKB <- fread(here::here(summaryStatDir, "bmi_with_overall.txt"))
   testDat <- cleanUKB %>% select(Zoverall, Zcad, Zbmi, pOverall, p_CAD, pBMI)
 } else if (aID == 2) {
   # three way - overall, cad, ilcco
   replication <- TRUE
+  pleiotropy <- FALSE
   cleanUKB <- fread(here::here(summaryStatDir, "lc_overall_three.txt"))
   testDat <- cleanUKB %>% select(zILCCO, zUKB, zMVP, pILCCO, pUKB, pMVP)
 } 
@@ -441,8 +443,9 @@ for (col_it in ((ncol(testDat)/2)+1):ncol(testDat)) {
   }
 }
 
+if (pleiotropy) {
 
-# run kernel
+  # run kernel
 if (doKernel) {
   oldResKernel <- emp_bayes_framework_R1(t_value = t, summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = TRUE, joint=FALSE, ind = TRUE,
                                          dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
@@ -488,7 +491,6 @@ if (do50df) {
 }
 
 # 3D cases pleiotropy
-if (threeway) {
   initPiList <- list(c(0.82))
   for (i in 2:7) {initPiList[[i]] <- c(0.08 / 12, 0.08 / 12)}
   initPiList[[8]] <- c(0.1)
@@ -508,8 +510,55 @@ if (threeway) {
 }
 
 
-# 3D cases replication
+###
 if (replication) {
+
+  # run kernel
+if (doKernel) {
+  oldResKernel <- emp_bayes_framework_R1(t_value = t, summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = TRUE, joint=FALSE, ind = TRUE,
+                                         dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
+  # oldResKernel <- emp_bayes_framework(summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = TRUE, joint=FALSE, ind = TRUE,
+  #                                   dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
+  if (class(oldResKernel)[1] != "list") {
+    kernelLfdr <- rep(NA, nrow(testDat))
+  } else {
+    kernelLfdr <- oldResKernel$lfdrVec
+  }
+  # save
+  write.table(kernelLfdr, paste0(fnameRoot, "_kernel.txt"), append=F, quote=F, row.names=F, col.names=T)
+}
+
+# run 7 df
+if (do7df) {
+  # oldRes7df <- emp_bayes_framework(summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = FALSE, joint=FALSE, ind = TRUE,
+  #                                  dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
+  oldRes7df <- emp_bayes_framework_R1(t_value = t, summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = FALSE, joint=FALSE, ind = TRUE,
+                                      dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
+  if (class(oldRes7df)[1] != "list") {
+    df7Lfdr <- rep(NA, nrow(testDat))
+  } else {
+    df7Lfdr <- oldRes7df$lfdrVec
+  }
+  # save
+  write.table(df7Lfdr, paste0(fnameRoot, "_df7.txt"), append=F, quote=F, row.names=F, col.names=T)
+}
+
+# run 50 df
+if (do50df) {
+  # oldRes50df <- emp_bayes_framework(summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = FALSE, joint=FALSE, ind = TRUE,
+  #                                 dfFit = 50, Hdist_epsilon=10^(-2), checkpoint=TRUE)
+  oldRes50df <- emp_bayes_framework_R1(t_value = t, summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = FALSE, joint=FALSE, ind = TRUE,
+                                       dfFit = 50, Hdist_epsilon=10^(-2), checkpoint=TRUE)
+  if (class(oldRes50df)[1] != "list") {
+    df50Lfdr <- rep(NA, nrow(testDat))
+  } else {
+    df50Lfdr <- oldRes50df$lfdrVec
+  }
+  # save
+  write.table(df50Lfdr, paste0(fnameRoot, "_df50.txt"), append=F, quote=F, row.names=F, col.names=T)
+}
+
+  # 3D cases Replication
   initPiList <- list(c(0.82))
   for (i in 2:7) {initPiList[[i]] <- c(0.08 / 12, 0.08 / 12)}
   initPiList[[8]] <- c(0.1)
@@ -521,7 +570,7 @@ if (replication) {
   initMuList[[8]] <- matrix(data=c(8, 8, 8), nrow=3)
   
   newRes <- symm_fit_ind_EM_R1(t_value = t, testStats = testDat[, 1:3], initMuList = initMuList, 
-                               initPiList = initPiList, sameDirAlt=TRUE, eps = newEps)
+                               initPiList = initPiList, sameDirAlt=replication, eps = newEps)
   
 }
 
