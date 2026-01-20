@@ -49,6 +49,7 @@ define_H_space_R1 <- function(K,t,sameDirAlt=FALSE) {
     as.matrix(.)
   
   H_annot <- rep(0, nrow(H_space))
+  ## Revised on 2026/01/20
   if (sameDirAlt) {
   # H_annot[which(apply(abs(H_space), 1, sum) == K)] <- 1
   H_annot[which(
