@@ -40,7 +40,7 @@ find_max_means_R1 <- function(muInfo) {
   # iterate, skip the first (0) and last (alternative)
   listLength <- length(muInfo)
   K <- nrow(muInfo[[1]])
-  S1 <- c(1,2,4,8)+1
+  S1 <- c(1,2,4,5,6,8,9,10)+1
   # Com_Set <- compute_sets(K,t)
   # S1 <- Com_Set[1]
   # just keep finding the max
@@ -278,7 +278,7 @@ symm_fit_ind_EM_R1 <- function(t_value, testStats, initMuList, initPiList, sameD
         muInfo[[b_it + 1]][, m_it] <- tempMuSum / tempDenom
         
         # make sure mean constraint is satisfied
-        S2 <- c(3,5,6,7,9,10,11,12,13,14,15)
+        S2 <- c(3,7,11,12,13,14,15)
         # Com_Set <- compute_sets(K,t)
         # S2 <- Com_Set[2]
         
