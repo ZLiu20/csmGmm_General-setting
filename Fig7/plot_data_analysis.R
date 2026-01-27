@@ -166,13 +166,13 @@ tab2final
 # Table 1
 qval <- 0.1
 
-initDat <- fread(here::here(outputDir, "med_analysis_aID1_newlfdr.txt")) %>%
-  select(Gene, Z_eqtl, Z_twas, Z_eqtl1, Z_twas1)
+# initDat <- fread(here::here(outputDir, "med_analysis_aID1_newlfdr.txt")) %>%
+#   select(Gene, Z_eqtl, Z_twas, Z_eqtl1, Z_twas1)
 
 # hold results
 allResList <- list()
 rejTab <- c()
-for(snp_it in 1:15) {
+for(snp_it in setdiff(1:15,c(1,4,12,15))) {
   
   tempRoot <- paste0(outputDir, "/med_analysis_aID", snp_it)
   tempStatsDat <- fread(paste0(tempRoot, "_dat.txt")) %>%
@@ -186,7 +186,7 @@ for(snp_it in 1:15) {
       mutate(avgNew = cummean(newLfdr)) %>%
       mutate(rejNew = ifelse(avgNew < qval, 1, 0)) %>%
       arrange(idx) %>%
-      select(-idx, -Gene, -Z_eqtl, -Z_twas, -Gene1, -Z_eqtl1, -Z_twas1)
+      select(-idx, -Gene, -Z_eqtl, -Z_twas, -Z_eqtl1, -Z_twas1)
   } else {tempNewDat <- data.frame(newLfdr=NA, rejNew=rep(0, nrow(tempStatsDat)), avgNew=NA)}
   
   if (file.exists(paste0(tempRoot, "_kernel.txt"))) {
@@ -221,21 +221,21 @@ for(snp_it in 1:15) {
   
   
   # put in list
-  fullDat <- cbind(tempStatsDat, tempNewDat, tempKernelDat, tempDf50Dat, tempDf7Dat) 
+  fullDat <- cbind(tempStatsDat, tempNewDat, tempKernelDat, tempDf7Dat)  # df50 method can't work
   allResList[[snp_it]] <- fullDat
   
   # rejections
-  tempRej <- fullDat %>% filter(rejDf50 == 1 | rejDf7 == 1 | rejNew == 1 | rejKernel == 1)
+  tempRej <- fullDat %>% filter( rejDf7 == 1 | rejNew == 1 | rejKernel == 1)
   rejTab <- rbind(rejTab, tempRej)
   
   cat(snp_it)
 }
 
 # look at rejections
-allRej <- rejTab %>% mutate(numRej = rejDf50 + rejDf7 + rejNew + rejKernel, na.rm=TRUE) %>%
+allRej <- rejTab %>% mutate(numRej = rejDf7 + rejNew + rejKernel, na.rm=TRUE) %>%
   arrange(desc(numRej)) %>%
   slice(1:5) %>%
-  select(Gene, Z_eqtl, Z_twas, Gene1, Z_eqtl1, Z_twas1, numRej, SNP)
+  select(Gene, Z_eqtl, Z_twas, Z_eqtl1, Z_twas1, numRej, SNP)
 
 # merge with information
 tab2DF <- data.frame(RS = c("rs71658797", "rs6920364", "rs11780471",
@@ -252,10 +252,6 @@ tab2DF <- data.frame(RS = c("rs71658797", "rs6920364", "rs11780471",
                      Chr = c(1, 6, 8, 15, 19, 3, 5, 8, 9, 10, 11, 15, 20, 6, 12), SNP=1:15)
 
 mergedRej <- merge(allRej, tab2DF, by="SNP") %>%
-  select(RS, Chr, BP, Locus, Gene, Z_eqtl, Z_twas, Gene1, Z_eqtl1, Z_twas1, numRej)
+  select(RS, Chr, BP, Locus, Gene, Z_eqtl, Z_twas, Z_eqtl1, Z_twas1, numRej)
 
 mergedRej
-
-
-
-
