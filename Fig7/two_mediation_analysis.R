@@ -369,7 +369,7 @@ twasRes <- read.csv(twasFname) %>%
 
 twasRes1 <- read.csv(twasFname1) %>%
   select(gene_name, zscore) %>%
-  set_colnames(c("Gene1", "Z_twas1")) %>%
+  set_colnames(c("Gene", "Z_twas1")) %>%
   filter(!is.na(Z_twas1))
 
 # loop through 15 SNPs
@@ -384,7 +384,7 @@ for (snp_it in 1:nrow(tab2DF)) {
                        tab2DF$Chr[snp_it], "_", tab2DF$BP[snp_it], "_blood", ".txt")
   tempEqtl1 <- fread(tempFname1) %>% 
     select(Gene, testStat) %>%
-    set_colnames(c("Gene1", "Z_eqtl1"))
+    set_colnames(c("Gene", "Z_eqtl1"))
   
   
   # merge
@@ -393,15 +393,15 @@ for (snp_it in 1:nrow(tab2DF)) {
   #   select(Z_twas, Z_eqtl) %>%
   #   as.matrix(.)
   
-  allDat1 <- tempEqtl1 %>% merge(twasRes1, by="Gene1") 
+  allDat1 <- tempEqtl1 %>% merge(twasRes1, by="Gene") 
   # testDat1 <- allDat1 %>%
   #   select(Z_twas1, Z_eqtl1) %>%
   #   as.matrix(.)
   
   #test statistics
- # Combin_data <- allDat1 %>% merge(allDat, by="Gene")
+  Combin_data <- allDat %>% merge(allDat1, by="Gene")
   
-  Combin_data <- cbind(allDat[1:nrow(allDat1),], allDat1)
+  # Combin_data <- cbind(allDat[1:nrow(allDat1),], allDat1)
   
   cat("colnames", colnames(allDat1))
   
