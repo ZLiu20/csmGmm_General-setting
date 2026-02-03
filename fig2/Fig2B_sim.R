@@ -425,8 +425,8 @@ margprob <- rep(0.3, setSize)
 simsPerEffSize <- 40
 effSizeMult <- ceiling(aID / simsPerEffSize)
 
-betaMin <- c(0.14, 0.24, 0.14, 0.24)
-betaMax <- c(0.24, 0.34, 0.24, 0.34)
+betaMin <- c(0.14, 0.14, 0.14, 0.14)
+betaMax <- c(0.18, 0.18, 0.18, 0.18)
                        
 # betaMin <- c(0.14, 0.18, 0.14, 0.18)
 # betaMax <- c(0.14, 0.18, 0.14, 0.18)
