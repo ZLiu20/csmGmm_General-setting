@@ -40,7 +40,7 @@ find_max_means_R1 <- function(muInfo) {
   # iterate, skip the first (0) and last (alternative)
   listLength <- length(muInfo)
   K <- nrow(muInfo[[1]])
-  S1 <- c(1,2,4,5,5,8,9,10)+1
+  S1 <- c(1,2,4,5,6,8,9,10)+1
   # Com_Set <- compute_sets(K,t)
   # S1 <- Com_Set[1]
   # just keep finding the max
