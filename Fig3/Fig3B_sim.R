@@ -2,7 +2,7 @@
 
 # Using the here package to manage file paths. If an error is thrown, please
 # set the working directory to the folder that holds this Rscript, e.g.
-# setwd("/path/to/csmGmm_reproduce/Fig3/Fig1B_sim.R") or set the path after the -cwd flag
+# setwd("/path/to/csmGmm_reproduce/Fig3/Fig3B_sim.R") or set the path after the -cwd flag
 # in the .lsf file, and then run again.
 here::i_am("Fig3/Fig3B_sim.R")
 
@@ -11,58 +11,20 @@ library(dplyr)
 library(mvtnorm)
 library(data.table)
 library(bindata)
-library(dplyr)
 library(magrittr)
 library(rje)
 library(ks)
 library(csmGmm)
 library(here)
 library(locfdr)
+library(qch)
+#library(adaFilter)
+library(adaFilter, lib.loc = "/rsrch8/home/biostatistics/zliu20/R/x86_64-pc-linux-gnu-library")
+
 
 
 # define the  function
-# Function to compute sets N and C
-compute_sets <- function(K, t) {
-  # Initialize sets N and C
-  N <- integer(0)
-  C <- integer(0)
-  
-  # Generate all possible configurations
-  for (i in 0:(3^K - 1)) {
-    # Convert to base 3 to represent configurations
-    base3 <- as.integer(intToBase3(i, K))
-    
-    # Calculate the number of non-zero elements
-    non_zero_count <- sum(abs(base3) == 1)
-    
-    # Calculate b_l based on the definition
-    b_l <- sum(2^(K - seq_len(K)) * (base3 == 1))
-    
-    # Classify into N or C based on the count of non-zero elements
-    if (non_zero_count <= t) {
-      N <- unique(c(N, b_l))
-    } else {
-      C <- unique(c(C, b_l))
-    }
-  }
-  
-  # Return sorted unique sets
-  return(list(N = sort(unique(N)), C = sort(unique(C))))
-}
-
-# Helper function to convert an integer to base 3
-intToBase3 <- function(n, length) {
-  base3 <- integer(length)
-  for (j in seq(length, 1)) {
-    base3[j] <- n %% 3
-    n <- n %/% 3
-  }
-  return(base3)
-}
-
-##
-find_max_means_R1 <- function(muInfo) {
-  
+find_max_means_R1 <- function(muInfo) { 
   # iterate, skip the first (0) and last (alternative)
   listLength <- length(muInfo)
   K <- nrow(muInfo[[1]])
@@ -79,7 +41,7 @@ find_max_means_R1 <- function(muInfo) {
   return(maxMeans)
 }
 
-
+##'
 define_H_space_R1 <- function(K,t) {
   H_space <- expand.grid( rep(list(c(-1,0,1)), K) )
   s <- rep(0, nrow(H_space))
@@ -99,7 +61,7 @@ define_H_space_R1 <- function(K,t) {
   return( list(H_space=H_space, H_annot=H_annot) )
 }
 
-
+##'
 emp_bayes_framework_R1 <- function(t_value, summary_tab, sameDirAlt=FALSE, nulltype=1, kernel=TRUE, joint=FALSE,
                                    ind=TRUE, dfFit=7, Hdist_epsilon=10^(-2), checkpoint=TRUE) {
   # Step 1 
@@ -340,27 +302,7 @@ symm_fit_ind_EM_R1 <- function(t_value, testStats, initMuList, initPiList, sameD
 
 
 ################################################################################
-#' check_incongruous.R
-#'
-#' Check the number of sets of test statistics that have a higher (less significant) lfdr value
-#' than other sets with test statistics of uniformly smaller magnitudes.
-#'
-#' @param zMatrix J*K vector of all test statistics.
-#' @param lfdrVec J*1 vector of lfdr values corresponding to each set of test statistics.
-#'
-#' @return A vector with all the indices of all sets that have a higher lfdr value those a set
-#' with smaller test statistic magnitudes.
-#' @importFrom dplyr mutate arrange desc select
-#' @importFrom rlang .data
-#'
-#' @export
-#' @examples
-#' zMatrix <- cbind(rnorm(10^4), rnorm(10^4))
-#' lfdrVec <- runif(10^4)
-#' check_incongruous(zMatrix = zMatrix, lfdrVec = lfdrVec)
-#'
-check_incongruous <- function(zMatrix, lfdrVec) {
-  
+check_incongruous <- function(zMatrix, lfdrVec) { 
   # remove lfdr = 1
   lessThanOne <- which(lfdrVec < 0.99)
   if (length(lessThanOne) <= 1) {return(c())}
@@ -395,7 +337,9 @@ check_incongruous <- function(zMatrix, lfdrVec) {
     tempStats <- abs(tempStats)
     
     # order by lfdr
-    tempDat <- tempStats %>% as.data.frame(.data) %>%
+    tempDat <- tempStats %>%
+      #as.data.frame(.data) %>%
+      as.data.frame() %>%
       dplyr::mutate(lfdr = tempLfdr) %>%
       dplyr::mutate(idx = idxVec)
     
@@ -422,36 +366,12 @@ check_incongruous <- function(zMatrix, lfdrVec) {
 }
 
 
-#' Tells if row x if allTestStats is an incongruous result (has a higher lfdr than a set of
-#' test statistics with lower magnitudes). For K=2 case.
-#'
-#' @param x Scalar, which row of allTestStats to check.
-#' @param allTestStats J*K vector of all test statistics.
-#'
-#' @return A scalar denoting the number of sets with lower lfdr and test statistics of lower magnitude. 0 means congruous result.
-#'
-#' @export
-#' @examples
-#' zMatrix <- cbind(rnorm(10^4), rnorm(10^4))
-#' find_2d(x = 5, allTestStats = zMatrix)
-#'
+#' 
 find_2d <- function(x, allTestStats) {
   length(which(allTestStats[1:x, 1] < allTestStats[x, 1] & allTestStats[1:x, 2] < allTestStats[x, 2]))
 }
 
-#' Tells if row x if allTestStats is an incongruous result (has a higher lfdr than a set of
-#' test statistics with lower magnitudes). For K=3 case.
-#'
-#' @param x Scalar, which row of allTestStats to check.
-#' @param allTestStats J*K vector of all test statistics.
-#'
-#' @return A scalar denoting the number of sets with lower lfdr and test statistics of lower magnitude. 0 means congruous result.
-#'
-#' @export
-#' @examples
-#' zMatrix <- cbind(rnorm(10^4), rnorm(10^4),  rnorm(10^4))
-#' find_3d(x = 5, allTestStats = zMatrix)
-#'
+#' 
 find_3d <- function(x, allTestStats) {
   length(which(allTestStats[1:x, 1] < allTestStats[x, 1] & allTestStats[1:x, 2] < allTestStats[x, 2] &
                  allTestStats[1:x, 3] < allTestStats[x, 3]))
@@ -460,7 +380,6 @@ find_3d <- function(x, allTestStats) {
 
 
 ################################################################################
-
 
 # record input - controls seed, parameters, etc.
 args <- commandArgs(trailingOnly=TRUE)
@@ -485,14 +404,17 @@ testStatsName <- here::here(outputDir, "Fig3B_allZ")
 betaName <- here::here(outputDir, "Fig3B_allBeta")
 
 # simulation parameters
-# doHDMT <- TRUE
-# doDACT <- TRUE
+#doHDMT <- TRUE
+#doDACT <- TRUE
 doHDMT <- FALSE
 doDACT <- FALSE
 doKernel <- TRUE
 do50df <- TRUE
 do7df <- TRUE
 doNew <- TRUE
+doQCH <- TRUE
+doAdaFilter <- TRUE
+
 qvalue <- 0.1
 nSNPs <- 10^5
 setSize <- 1000
@@ -504,12 +426,10 @@ t <- 1
 margprob <- rep(0.3, setSize)
 simsPerEffSize <- 20
 effSizeMult <- ceiling(aID / simsPerEffSize)
+# betaMin <- c(0.14 + 0.01 * effSizeMult, 0.14 + 0.01 * effSizeMult, 0.14 + 0.01 * effSizeMult)
+# betaMax <- c(0.24 + 0.01 * effSizeMult, 0.24 + 0.01 * effSizeMult, 0.24 + 0.01 * effSizeMult)
 betaMin <- c(0.38, 0.38, 0.38)
 betaMax <- c(0.38, 0.38, 0.38)
-# betaMin <- c(0.38, 0.38, 0.38) #result is good, but power is not enough
-# betaMax <- c(0.58, 0.58, 0.58)
-# betaMin <- c(0.38, 0.38, 0.38)
-# betaMax <- c(0.55, 0.55, 0.55)
 beta0 <- -1
 
 # determines how many signals there are
@@ -518,6 +438,7 @@ pi11 <- 3 * pi1^2
 pi111 <- pi11 / 2
 pi00 <- 1 - 3 * pi1 - 3 * pi11 - pi111
 sProp <- c(pi00, 3 * pi1, 3 * pi11, pi111)
+# sProp <- c(0.9582, 0.04, 0.0012, 0.0006)
 hMat <- expand.grid(c(-1, 0, 1), c(-1, 0, 1), c(-1, 0, 1)) %>%
   as.matrix(.) %>%
   cbind(., rowSums(abs(.))) %>%
@@ -525,51 +446,60 @@ hMat <- expand.grid(c(-1, 0, 1), c(-1, 0, 1), c(-1, 0, 1)) %>%
   set_colnames(c(paste0("Var", 1:(ncol(.)-1)), "s")) %>%
   arrange(s)
 number <- c()
-
 for (s_it in 0:max(hMat$s)) {
   numRows <- length(which(hMat$s == s_it))
   number <- c(number, rep(sProp[s_it + 1] * nSNPs / numRows, numRows))
 }
-
 hMat <- hMat %>% mutate(number = number) %>%
   mutate(number = round(number))
 
+if (doQCH) {
+  Hconfig_qch <- qch::GetHconfig(nDims)
+  H1config_qch <- qch::GetH1AtLeast(Hconfig_qch, AtLeast = 2)
+  qch_test_name <- paste0("AtLeast_", 2)
+}
+
 # record results here
-powerRes <- data.frame(nCausal=rep(NA, nSims), minEff1=pi1,
-                       seed=NA, pi0aTrue=NA, pi0bTrue=NA,
-                       nRejDACT=NA, nRejHDMT=NA, nRejKernel=NA, nRej7df=NA, nRej50df=NA, nRejNew=NA,
-                       powerDACT=NA, powerHDMT=NA, powerKernel=NA, power7df=NA,
-                       power50df=NA, powerNew=NA, fdpDACT=NA, fdpHDMT=NA, fdpKernel=NA, fdp7df=NA, fdp50df=NA, fdpNew=NA,
-                       inconKernel=NA, incon7df=NA, incon50df=NA, inconNew=NA)
+powerRes <- data.frame(
+  nCausal = rep(NA, nSims), minEff1=pi1, seed = NA,
+  pi0aTrue = NA, pi0bTrue = NA, pi0cTrue = NA,
+  nRejDACT = NA, nRejHDMT = NA, nRejKernel = NA, nRej7df = NA, nRej50df = NA, nRejNew = NA,
+  nRejQCH = NA, nRejAda = NA,
+  powerDACT = NA, powerHDMT = NA, powerKernel = NA, power7df = NA, power50df = NA, powerNew = NA,
+  powerQCH = NA, powerAda = NA,
+  fdpDACT = NA, fdpHDMT = NA, fdpKernel = NA, fdp7df = NA, fdp50df = NA, fdpNew = NA,
+  fdpQCH = NA, fdpAda = NA,
+  inconKernel = NA, incon7df = NA, incon50df = NA, inconNew = NA,inconQCH = NA, inconAda = NA
+)
+
+
 for (sim_it in 1:nSims) {
-  
   # set the seed 
   set.seed(aID * 10^5 + sim_it)
   powerRes$seed[sim_it] <- aID * 10^5 + sim_it
-
+  
   # load or save data
   if (loadData) {
-    setwd(outputDir)
     allZ <- fread(paste0(testStatsName, "_aID", aID, "_sim", sim_it, ".txt"), data.table=F)
     allBeta <- fread(paste0(betaName, "_aID", aID, "_sim", sim_it, ".txt"), data.table=F)
   } else { 
     # hold test statistics and signals
     allZ <- matrix(data=NA, nrow=nSNPs, ncol=nDims)
     allBeta <- matrix(data=NA, nrow=nSNPs, ncol=nDims)
-
+    
     # select signal locations
     sigLocsMat <- allocate_sigs(hMat = hMat, nSNPs = nSNPs, nDims=nDims)
-  
+    
     # generate data in multiple sets - faster than all at once 
     for (set_it in 1:nSets)  {
-
+      
       # information we need to save
       statsMat <- matrix(data=NA, nrow=setSize, ncol=nDims)
-
+      
       # generate coefficient matrix    
       coefMat <- set_beta(sigLocsMat = sigLocsMat, set_it = set_it, setSize = setSize, 
-                       betaMin=betaMin, betaMax=betaMax) 
-  
+                          betaMin=betaMin, betaMax=betaMax) 
+      
       ########################################### 
       # three dimensional pleiotropy
       tempG1 <-  sapply(X=margprob, FUN=rbinom, n=n, size=2)
@@ -578,7 +508,7 @@ for (sim_it in 1:nSims) {
       tempAlpha <- coefMat[, 1]
       tempBeta <- coefMat[, 2]
       tempGamma <- coefMat[, 3]
-    
+      
       # generate first outcome
       tempEta1 <- sweep(tempG1, MARGIN=2, STATS=tempAlpha, FUN="*") + matrix(data=beta0, nrow=nrow(tempG1), ncol=ncol(tempG1))
       tempMu1 <- rje::expit(as.numeric(tempEta1))
@@ -594,7 +524,7 @@ for (sim_it in 1:nSims) {
       tempMu3 <- rje::expit(as.numeric(tempEta3))
       tempY3 <- rbinom(n=length(tempMu3), size=1, prob=tempMu3)
       yMat3 <- matrix(data=tempY3, nrow=nrow(tempEta3), ncol=ncol(tempEta3), byrow=FALSE)
-
+      
       # calculate all test statistics 
       for (test_it in 1:ncol(yMat1)) {
         tempMod1 <- glm(yMat1[, test_it] ~ tempG1[, test_it], family=binomial)
@@ -604,25 +534,23 @@ for (sim_it in 1:nSims) {
         statsMat[test_it, 2] <- summary(tempMod2)$coefficients[2, 3]
         statsMat[test_it, 3] <- summary(tempMod3)$coefficients[2, 3]
       } 
-   
+      
       # record
       startIdx <- (set_it - 1) * setSize + 1
       endIdx <- set_it * setSize
       allZ[startIdx:endIdx, ] <- statsMat
       allBeta[startIdx:endIdx, ] <- coefMat
-   
+      
       # checkpoint 
       if(set_it%%1 == 0) {cat(set_it)}
     } # done generating data
-
+    
     # save it
     if (saveData) { 
-      setwd(outputDir)
       write.table(allZ, paste0(testStatsName, "_aID", aID, "_sim", sim_it, ".txt"), append=F, quote=F, row.names=F, col.names=T, sep='\t')
       write.table(allBeta, paste0(betaName, "_aID", aID, "_sim", sim_it, ".txt"), append=F, quote=F, row.names=F, col.names=T, sep='\t')
     }
-  }
-
+  } 
   # number of signals and causal SNPs
   #causalVec <- as.numeric(allBeta[, 1] != 0 & allBeta[, 2] != 0 & allBeta[, 3] != 0)  # revised on 30/11/2025
   causalVec <- as.numeric(rowSums(allBeta != 0) >= t+1 & rowSums(allBeta != 0) <= nDims)
@@ -630,7 +558,7 @@ for (sim_it in 1:nSims) {
   powerRes$pi0aTrue[sim_it] <- length(which(allBeta[, 1] != 0))
   powerRes$pi0bTrue[sim_it] <- length(which(allBeta[, 2] != 0))
   powerRes$pi0cTrue[sim_it] <- length(which(allBeta[, 3] != 0))
-
+  
   # adjustment to not get p-values of 0 needed for DACT and HDMT
   for (col_it in 1:ncol(allZ)) {
     tooBig <- which(allZ[, col_it] > 8.1)
@@ -647,11 +575,148 @@ for (sim_it in 1:nSims) {
   
   # hold the results
   totOut <- data.frame(X1 = allP[, 1], X2 = allP[, 2], X3 = allP[, 3], origIdx = 1:nrow(allP), causal=causalVec)
- 
+  
+  
+  # -----------------------------
+  # qch method (AtLeast = 2)
+  # -----------------------------
+  if (doQCH) {
+    pmat <- as.matrix(allP)
+    pmat[!is.finite(pmat)] <- 1
+    pmat <- pmin(pmax(pmat, 0), 1)
+    
+    qch_out <- tryCatch({
+      qch_fit <- qch::qch.fit(
+        pValMat = as.data.frame(pmat),
+        Hconfig = Hconfig_qch,
+        copula = "gaussian",
+        plotting = FALSE
+      )
+      qch_res <- qch::qch.test(
+        res.qch.fit = qch_fit,
+        Hconfig = Hconfig_qch,
+        Hconfig.H1 = H1config_qch,   # AtLeast_2
+        Alpha = qvalue
+      )
+      
+      qch_lfdr <- qch_res$lFDR[[qch_test_name]]
+      
+      if (!is.null(qch_lfdr) && length(qch_lfdr) == nrow(totOut)) {
+        qch_lfdr <- as.numeric(qch_lfdr)
+        qch_lfdr[!is.finite(qch_lfdr)] <- 1
+        qch_lfdr <- pmin(pmax(qch_lfdr, 0), 1)
+        
+        totOut <- totOut %>%
+          mutate(qchLfdr = qch_lfdr) %>%
+          arrange(qchLfdr) %>%
+          mutate(qchAvg = cummean(qchLfdr)) %>%
+          arrange(origIdx)
+        
+        rej <- as.integer(totOut$qchAvg < qvalue)
+        incon_val <- length(check_incongruous(zMatrix = allZ, lfdrVec = qch_lfdr))
+      } else {
+        decision <- qch_res$Rejection[[qch_test_name]]
+        if (is.null(decision)) stop("qch decision is NULL")
+        
+        rej <- as.integer(decision == 1)
+        totOut <- totOut %>% mutate(qchLfdr = NA_real_, qchAvg = NA_real_)
+        incon_val <- NA
+      }
+      
+      nRej <- sum(rej)
+      list(
+        nRej  = nRej,
+        power = ifelse(sum(causalVec) > 0, sum(rej == 1 & causalVec == 1) / sum(causalVec), 0),
+        fdp   = ifelse(nRej > 0, sum(rej == 1 & causalVec == 0) / nRej, 0),
+        incon = incon_val
+      )
+    }, error = function(e) {
+      totOut <<- totOut %>% mutate(qchLfdr = NA_real_, qchAvg = NA_real_)
+      list(nRej = NA, power = NA, fdp = NA, incon = NA)
+    })
+    
+    powerRes$nRejQCH[sim_it]  <- qch_out$nRej
+    powerRes$powerQCH[sim_it] <- qch_out$power
+    powerRes$fdpQCH[sim_it]   <- qch_out$fdp
+    powerRes$inconQCH[sim_it] <- qch_out$incon
+  } else {
+    totOut <- totOut %>% mutate(qchLfdr = NA_real_, qchAvg = NA_real_)
+    powerRes$inconQCH[sim_it] <- NA
+  }
+  
+  # -----------------------------
+  # adaFilter method (r = 2)
+  # -----------------------------
+  if (doAdaFilter) {
+    pmat <- as.matrix(allP)
+    pmat[!is.finite(pmat)] <- 1
+    pmat <- pmin(pmax(pmat, 0), 1)
+    
+    ada_out <- tryCatch(
+      adaFilter::adaFilter(pmat, r = 2),
+      error = function(e) NULL
+    )
+    
+    if (!is.null(ada_out) && !is.null(ada_out$adjusted.p)) {
+      adjp <- as.numeric(ada_out$adjusted.p)
+      
+      if (length(adjp) == nrow(totOut)) {
+        adjp[!is.finite(adjp)] <- 1
+        adjp <- pmin(pmax(adjp, 0), 1)
+        
+        totOut <- totOut %>%
+          mutate(adaLfdr = adjp) %>%
+          arrange(adaLfdr) %>%
+          mutate(adaAvg = cummean(adaLfdr)) %>%
+          arrange(origIdx)
+        
+        nRejAda <- length(which(totOut$adaAvg < qvalue))
+        nCausal <- sum(causalVec)
+        
+        powerRes$nRejAda[sim_it]  <- nRejAda
+        powerRes$fdpAda[sim_it]   <- ifelse(nRejAda > 0,
+                                            sum(totOut$adaAvg < qvalue & totOut$causal == 0) / nRejAda, 0)
+        powerRes$powerAda[sim_it] <- ifelse(nCausal > 0,
+                                            sum(totOut$adaAvg < qvalue & totOut$causal == 1) / nCausal, 0)
+        powerRes$inconAda[sim_it] <- length(check_incongruous(zMatrix = allZ, lfdrVec = adjp))
+      } else {
+        totOut <- totOut %>% mutate(adaLfdr = NA_real_, adaAvg = NA_real_)
+        powerRes$nRejAda[sim_it]  <- NA
+        powerRes$powerAda[sim_it] <- NA
+        powerRes$fdpAda[sim_it]   <- NA
+        powerRes$inconAda[sim_it] <- NA
+      }
+      
+    } else if (!is.null(ada_out) && !is.null(ada_out$decision) &&
+               length(ada_out$decision) == nrow(totOut)) {
+      ada_rej <- as.integer(ada_out$decision == 1)
+      nRejAda <- sum(ada_rej)
+      nCausal <- sum(causalVec)
+      
+      totOut <- totOut %>% mutate(adaLfdr = NA_real_, adaAvg = NA_real_)
+      powerRes$nRejAda[sim_it]  <- nRejAda
+      powerRes$fdpAda[sim_it]   <- ifelse(nRejAda > 0, sum(ada_rej == 1 & causalVec == 0) / nRejAda, 0)
+      powerRes$powerAda[sim_it] <- ifelse(nCausal > 0, sum(ada_rej == 1 & causalVec == 1) / nCausal, 0)
+      powerRes$inconAda[sim_it] <- NA
+    } else {
+      totOut <- totOut %>% mutate(adaLfdr = NA_real_, adaAvg = NA_real_)
+      powerRes$nRejAda[sim_it]  <- NA
+      powerRes$powerAda[sim_it] <- NA
+      powerRes$fdpAda[sim_it]   <- NA
+      powerRes$inconAda[sim_it] <- NA
+    }
+  } else {
+    totOut <- totOut %>% mutate(adaLfdr = NA_real_, adaAvg = NA_real_)
+    powerRes$inconAda[sim_it] <- NA
+  }
+  
+  
+  
+  
   # old method - kernel
   if (doKernel) {
     oldResKernel <- emp_bayes_framework_R1(t_value = t, summary_tab = allZ, kernel = TRUE, joint=FALSE, ind = TRUE,
-                                        dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
+                                           dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
     if (class(oldResKernel)[1] == "list") {
       totOut <- totOut %>% mutate(kernelLfdr = oldResKernel$lfdrVec) %>%
         arrange(kernelLfdr) %>%
@@ -665,12 +730,12 @@ for (sim_it in 1:nSims) {
       totOut <- totOut %>% mutate(kernelLfdr = NA, kernelAvg=NA)
     }
   } else {totOut <- totOut %>% mutate(kernelLfdr = NA, kernelAvg=NA)}
-
-
+  
+  
   # old method - 7 df
   if (do7df) {
     oldRes7df <- emp_bayes_framework_R1(t_value = t, summary_tab = allZ, kernel = FALSE, joint=FALSE, ind = TRUE,
-                                      dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
+                                        dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
     if (class(oldRes7df)[1] == "list") {
       totOut <- totOut %>% mutate(df7Lfdr = oldRes7df$lfdrVec) %>%
         arrange(df7Lfdr) %>%
@@ -685,21 +750,21 @@ for (sim_it in 1:nSims) {
       totOut <- totOut %>% mutate(df7Lfdr = NA, df7Avg=NA)
     }
   } else {totOut <- totOut %>% mutate(df7Lfdr = NA, df7Avg=NA)}
-
+  
   # old method - 50 df
   if (do50df) {
     oldRes50df <- emp_bayes_framework_R1(t_value = t, summary_tab = allZ, kernel = FALSE, joint=FALSE, ind = TRUE,
-                                      dfFit = 50, Hdist_epsilon=10^(-2), checkpoint=TRUE)
+                                         dfFit = 50, Hdist_epsilon=10^(-2), checkpoint=TRUE)
     if (class(oldRes50df)[1] == "list") {
       totOut <- totOut %>% mutate(df50Lfdr = oldRes50df$lfdrVec) %>%
         arrange(df50Lfdr) %>%
         mutate(df50Avg = cummean(df50Lfdr)) %>%
         # don't forget to set it back to original index for further additions!!
         arrange(origIdx)
-    powerRes$fdp50df[sim_it] <- length(which(totOut$df50Avg < 0.1 & totOut$causal == 0)) /  length(which(totOut$df50Avg < 0.1))
-    powerRes$power50df[sim_it] <- length(which(totOut$df50Avg < 0.1 & totOut$causal == 1)) / sum(causalVec)
-    powerRes$incon50df[sim_it] <- length(check_incongruous(zMatrix = allZ, lfdrVec = oldRes50df$lfdrVec))
-    powerRes$nRej50df[sim_it] <- length(which(totOut$df50Avg < 0.1))
+      powerRes$fdp50df[sim_it] <- length(which(totOut$df50Avg < 0.1 & totOut$causal == 0)) /  length(which(totOut$df50Avg < 0.1))
+      powerRes$power50df[sim_it] <- length(which(totOut$df50Avg < 0.1 & totOut$causal == 1)) / sum(causalVec)
+      powerRes$incon50df[sim_it] <- length(check_incongruous(zMatrix = allZ, lfdrVec = oldRes50df$lfdrVec))
+      powerRes$nRej50df[sim_it] <- length(which(totOut$df50Avg < 0.1))
     } else {
       totOut <- totOut %>% mutate(df50Lfdr = NA, df50Avg=NA)
     }
@@ -716,8 +781,8 @@ for (sim_it in 1:nSims) {
       initMuList[[i]] <- cbind(rep(2, 3), rep(5, 3))
     }
     initMuList[[8]] <- matrix(data=c(8, 8, 8), nrow=3)
-    #newRes <- symm_fit_ind_EM(testStats = allZ, initMuList = initMuList, initPiList = initPiList, eps=10^(-5))
-    newRes <- symm_fit_ind_EM_R1(t_value = t, testStats = allZ, initMuList = initMuList, initPiList = initPiList, eps=10^(-5))
+    newRes <- symm_fit_ind_EM_R1(t_value = t, testStats = allZ, initMuList = initMuList,
+                                 initPiList = initPiList, eps=10^(-5))
     
     # record
     totOut <- totOut %>% mutate(newLfdr = newRes$lfdrResults) %>%
@@ -734,7 +799,7 @@ for (sim_it in 1:nSims) {
   cat('\n \n \n \n \n \n \n \n \n \n \n')
 }
 
-setwd(outputDir)
+# save
 write.table(powerRes, outName, append=F, quote=F, row.names=F, col.names=T, sep='\t')
 
 
