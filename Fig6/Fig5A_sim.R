@@ -1,10 +1,10 @@
-# Figure 6A
+# Figure 5A
 
 # Using the here package to manage file paths. If an error is thrown, please
 # set the working directory to the folder that holds this Rscript, e.g.
-# setwd("/path/to/csmGmm_reproduce/Fig3/Fig2A_sim.R") or set the path after the -cwd flag
+# setwd("/path/to/csmGmm_reproduce/Fig5/Fig5A_sim.R") or set the path after the -cwd flag
 # in the .lsf file, and then run again.
-here::i_am("Fig6/Fig6A_sim.R")
+here::i_am("Fig6/Fig5A_sim.R")
 
 
 # load libraries
