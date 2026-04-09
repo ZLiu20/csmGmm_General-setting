@@ -1,7 +1,7 @@
-# Collect results and plot Figure 3
+# Collect results and plot Figure 2
 # Using the here package to manage file paths. If an error is thrown, please
 # set the working directory to the folder that holds this Rscript, e.g.
-# setwd("/path/to/csmGmm_reproduce/Fig3/plot_fig3.R") or set the path after the -cwd flag
+# setwd("/path/to/csmGmm_reproduce/Fig2/plot_fig2.R") or set the path after the -cwd flag
 # in the .lsf file, and then run again
 
 setwd("~/Downloads/csmGmm_sim_R3/Fig2")
@@ -15,6 +15,165 @@ library(data.table)
 library(csmGmm)
 library(here)
 
+
+summarize_raw_R1 <- function(fullDat, full = FALSE, cor = FALSE, maxP = FALSE, FDP2 = FALSE) {
+  safe_mean <- function(x) {
+    if (all(is.na(x))) NA_real_ else mean(x, na.rm = TRUE)
+  }
+  
+  out_list <- list()
+  effSizes <- sort(unique(fullDat$minEff1))
+  
+  for (i in seq_along(effSizes)) {
+    tempEff <- effSizes[i]
+    
+    tempDat <- fullDat %>%
+      dplyr::filter(minEff1 == tempEff) %>%
+      as.data.frame() %>%
+      dplyr::mutate(
+        fdpDACT   = ifelse(nRejDACT   == 0, 0, fdpDACT),
+        fdpHDMT   = ifelse(nRejHDMT   == 0, 0, fdpHDMT),
+        fdpKernel = ifelse(nRejKernel == 0, 0, fdpKernel),
+        fdp7df    = ifelse(nRej7df    == 0, 0, fdp7df),
+        fdp50df   = ifelse(nRej50df   == 0, 0, fdp50df),
+        fdpNew    = ifelse(nRejNew    == 0, 0, fdpNew),
+        fdpDEIB   = ifelse(nRejDEIB   == 0, 0, fdpDEIB),
+        fdpMTEST  = ifelse(nRejMTEST  == 0, 0, fdpMTEST)
+      )
+    
+    if (cor) {
+      tempDat <- tempDat %>%
+        dplyr::mutate(
+          fdpCor = ifelse(nRejCor == 0, 0, fdpCor),
+          fdpNew = fdpCor, powerNew = powerCor, nRejNew = nRejCor
+        )
+    }
+    
+    if (full) {
+      tempDat <- tempDat %>%
+        dplyr::mutate(
+          fdpFull = ifelse(nRejFull == 0, 0, fdpFull),
+          fdpDACT = fdpFull, powerDACT = powerFull, nRejDACT = nRejFull
+        )
+    }
+    
+    if (maxP) {
+      methods <- c("MaxP", "DACT", "HDMT", "Kernel", "df7", "df50", "New", "DEIB", "MTEST")
+      
+      summaryOut <- data.frame(
+        minEff1 = tempDat$minEff1[1],
+        Method = methods,
+        stringsAsFactors = FALSE
+      )
+      
+      summaryOut$nRej <- c(
+        safe_mean(tempDat$nRejMaxp), safe_mean(tempDat$nRejDACT), safe_mean(tempDat$nRejHDMT),
+        safe_mean(tempDat$nRejKernel), safe_mean(tempDat$nRej7df), safe_mean(tempDat$nRej50df),
+        safe_mean(tempDat$nRejNew), safe_mean(tempDat$nRejDEIB), safe_mean(tempDat$nRejMTEST)
+      )
+      
+      summaryOut$Power <- c(
+        safe_mean(tempDat$powerMaxp), safe_mean(tempDat$powerDACT), safe_mean(tempDat$powerHDMT),
+        safe_mean(tempDat$powerKernel), safe_mean(tempDat$power7df), safe_mean(tempDat$power50df),
+        safe_mean(tempDat$powerNew), safe_mean(tempDat$powerDEIB), safe_mean(tempDat$powerMTEST)
+      )
+      
+      summaryOut$FDP <- c(
+        safe_mean(tempDat$fdpMaxp), safe_mean(tempDat$fdpDACT), safe_mean(tempDat$fdpHDMT),
+        safe_mean(tempDat$fdpKernel), safe_mean(tempDat$fdp7df), safe_mean(tempDat$fdp50df),
+        safe_mean(tempDat$fdpNew), safe_mean(tempDat$fdpDEIB), safe_mean(tempDat$fdpMTEST)
+      )
+      
+      summaryOut$Incongruous <- c(
+        NA_real_, NA_real_, NA_real_,
+        safe_mean(tempDat$inconKernel), safe_mean(tempDat$incon7df),
+        safe_mean(tempDat$incon50df), safe_mean(tempDat$inconNew),
+        safe_mean(tempDat$inconDEIB), safe_mean(tempDat$inconMTEST)
+      )
+      
+      summaryOut$numNA <- c(
+        sum(is.na(tempDat$powerMaxp)), sum(is.na(tempDat$powerDACT)), sum(is.na(tempDat$powerHDMT)),
+        sum(is.na(tempDat$powerKernel)), sum(is.na(tempDat$power7df)), sum(is.na(tempDat$power50df)),
+        sum(is.na(tempDat$powerNew)), sum(is.na(tempDat$powerDEIB)), sum(is.na(tempDat$powerMTEST))
+      )
+      
+      if (FDP2) {
+        summaryOut$sig2Pow <- c(
+          NA_real_, safe_mean(tempDat$sig2PowDACT), safe_mean(tempDat$sig2PowHDMT),
+          safe_mean(tempDat$sig2PowKernel), safe_mean(tempDat$sig2Pow7df),
+          safe_mean(tempDat$sig2Pow50df), safe_mean(tempDat$sig2PowNew),
+          safe_mean(tempDat$sig2PowDEIB), safe_mean(tempDat$sig2PowMTEST)
+        )
+        
+        summaryOut$sig2FDb.P <- c(
+          NA_real_, safe_mean(tempDat$sig2fdpDACT), safe_mean(tempDat$sig2fdpHDMT),
+          safe_mean(tempDat$sig2fdpKernel), safe_mean(tempDat$sig2fdp7df),
+          safe_mean(tempDat$sig2fdp50df), safe_mean(tempDat$sig2fdpNew),
+          safe_mean(tempDat$sig2fdpDEIB), safe_mean(tempDat$sig2fdpMTEST)
+        )
+      }
+      
+    } else {
+      methods <- c("DACT", "HDMT", "Kernel", "df7", "df50", "New", "DEIB", "MTEST")
+      
+      summaryOut <- data.frame(
+        minEff1 = tempDat$minEff1[1],
+        Method = methods,
+        stringsAsFactors = FALSE
+      )
+      
+      summaryOut$nRej <- c(
+        safe_mean(tempDat$nRejDACT), safe_mean(tempDat$nRejHDMT), safe_mean(tempDat$nRejKernel),
+        safe_mean(tempDat$nRej7df), safe_mean(tempDat$nRej50df), safe_mean(tempDat$nRejNew),
+        safe_mean(tempDat$nRejDEIB), safe_mean(tempDat$nRejMTEST)
+      )
+      
+      summaryOut$Power <- c(
+        safe_mean(tempDat$powerDACT), safe_mean(tempDat$powerHDMT), safe_mean(tempDat$powerKernel),
+        safe_mean(tempDat$power7df), safe_mean(tempDat$power50df), safe_mean(tempDat$powerNew),
+        safe_mean(tempDat$powerDEIB), safe_mean(tempDat$powerMTEST)
+      )
+      
+      summaryOut$FDP <- c(
+        safe_mean(tempDat$fdpDACT), safe_mean(tempDat$fdpHDMT), safe_mean(tempDat$fdpKernel),
+        safe_mean(tempDat$fdp7df), safe_mean(tempDat$fdp50df), safe_mean(tempDat$fdpNew),
+        safe_mean(tempDat$fdpDEIB), safe_mean(tempDat$fdpMTEST)
+      )
+      
+      summaryOut$Incongruous <- c(
+        NA_real_, NA_real_, safe_mean(tempDat$inconKernel), safe_mean(tempDat$incon7df),
+        safe_mean(tempDat$incon50df), safe_mean(tempDat$inconNew), 
+        safe_mean(tempDat$inconDEIB), safe_mean(tempDat$inconMTEST)
+      )
+      
+      summaryOut$numNA <- c(
+        sum(is.na(tempDat$powerDACT)), sum(is.na(tempDat$powerHDMT)), sum(is.na(tempDat$powerKernel)),
+        sum(is.na(tempDat$power7df)), sum(is.na(tempDat$power50df)), sum(is.na(tempDat$powerNew)),
+        sum(is.na(tempDat$powerDEIB)), sum(is.na(tempDat$powerMTEST))
+      )
+      
+      if (FDP2) {
+        summaryOut$sig2Pow <- c(
+          safe_mean(tempDat$sig2PowDACT), safe_mean(tempDat$sig2PowHDMT), safe_mean(tempDat$sig2PowKernel),
+          safe_mean(tempDat$sig2Pow7df), safe_mean(tempDat$sig2Pow50df), safe_mean(tempDat$sig2PowNew),
+          safe_mean(tempDat$sig2PowDEIB), safe_mean(tempDat$sig2PowMTEST)
+        )
+        
+        summaryOut$sig2FDb.P <- c(
+          safe_mean(tempDat$sig2fdpDACT), safe_mean(tempDat$sig2fdpHDMT), safe_mean(tempDat$sig2fdpKernel),
+          safe_mean(tempDat$sig2fdp7df), safe_mean(tempDat$sig2fdp50df), safe_mean(tempDat$sig2fdpNew),
+          safe_mean(tempDat$sig2fdpDEIB), safe_mean(tempDat$sig2fdpMTEST)
+        )
+      }
+    }
+    
+    out_list[[i]] <- summaryOut
+  }
+  
+  dplyr::bind_rows(out_list)
+}
+
+
 # source the .R scripts from the SupportingCode/ folder 
 codePath <- c(here::here("SupportingCode"))
 toBeSourced <- list.files(codePath, "\\.R$")
@@ -24,8 +183,8 @@ purrr::map(paste0(codePath, "/", toBeSourced), source)
 outputDir <- here::here("Fig2", "output")
 
 ##output
-names2a <- here::here(outputDir, paste0("Fig7A_aID", 120:780, ".txt"))
-names2b <- here::here(outputDir, paste0("Fig7B_aID", 1:400, ".txt"))
+names2a <- here::here(outputDir, paste0("Fig2A_aID", 120:780, ".txt"))
+names2b <- here::here(outputDir, paste0("Fig2B_aID", 1:400, ".txt"))
 
 
 #-----------------------------------------#
