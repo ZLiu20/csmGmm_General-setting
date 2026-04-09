@@ -9,6 +9,6 @@
 #BSUB -M 16
 #BSUB -R rusage[mem=4]
 
-# do 441-1241 of these
+# run 310-1041
 module load R/4.5.1
 Rscript /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig5/Fig5B_sim.R $LSB_JOBINDEX 1 >/rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig5/errDir/Fig5B_$LSB_JOBINDEX.out
