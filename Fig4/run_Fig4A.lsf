@@ -1,4 +1,4 @@
-#BSUB -J Fig4A[1-441]
+#BSUB -J Fig4A[121-900]
 #BSUB -W 15:00
 #BSUB -o /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig4/errDir/Fig4A_log%I.out
 #BSUB -e /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig4/errDir/Fig4A_%I.err
@@ -8,6 +8,6 @@
 #BSUB -n 1
 #BSUB -M 8
 #BSUB -R rusage[mem=4]
-# run 1-400
+# run 121-900
 module load R/4.5.1
 Rscript /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig4/Fig4A_sim.R $LSB_JOBINDEX 1 >/rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig4/errDir/Fig4A_$LSB_JOBINDEX.out
