@@ -20,9 +20,7 @@ library(here)
 library(locfdr)
 
 
-
 # define the  function
-
 ################################################################################
 find_max_means_R1 <- function(muInfo) {
   # iterate, skip the first (0) and last (alternative)
@@ -518,15 +516,15 @@ toBeSourced <- list.files(codePath, "\\.R$")
 purrr::map(paste0(codePath, "/", toBeSourced), source)
 
 # set output directory 
-outputDir <- here::here("Fig7", "output")
-outName <- paste0(outputDir, "/Fig7A_aID", aID, ".txt")
+outputDir <- here::here("Fig2", "output")
+outName <- paste0(outputDir, "/Fig2A_aID", aID, ".txt")
 
 # option to save or load intermediate data to save time
 loadData <- FALSE
 saveData <- FALSE
 # these names are for if saveData <- TRUE
-testStatsName <- here::here(outputDir, "Fig7A_allZ")
-betaName <- here::here(outputDir, "Fig7A_allBeta")
+testStatsName <- here::here(outputDir, "Fig2A_allZ")
+betaName <- here::here(outputDir, "Fig2A_allBeta")
 
 # simulation parameters start here
 doHDMT <- FALSE
