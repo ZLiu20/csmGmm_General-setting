@@ -161,97 +161,135 @@ tab2final
 
 
 #----------------------------------------------------------------------------------------#
-
-
 # Table 1
 qval <- 0.1
-
-# initDat <- fread(here::here(outputDir, "med_analysis_aID1_newlfdr.txt")) %>%
-#   select(Gene, Z_eqtl, Z_twas, Z_eqtl1, Z_twas1)
-
-# hold results
-allResList <- list()
-rejTab <- c()
-for(snp_it in setdiff(1:15,c(1,4,12,15))) {
+read_method_lfdr <- function(file_path, lfdr_col, avg_col, rej_col, n_ref, keep_only_col = NULL) {
+  if (!file.exists(file_path)) {
+    out <- data.frame(tmp = rep(NA_real_, n_ref))
+    names(out) <- lfdr_col
+  } else {
+    raw <- fread(file_path)
+    if (!is.null(keep_only_col) && keep_only_col %in% names(raw)) {
+      out <- raw %>% transmute(!!lfdr_col := .data[[keep_only_col]])
+    } else {
+      out <- raw[, 1, drop = FALSE]
+      names(out) <- lfdr_col
+    }
+  }
   
-  tempRoot <- paste0(outputDir, "/med_analysis_aID", snp_it)
+  out %>%
+    mutate(idx = row_number()) %>%
+    arrange(.data[[lfdr_col]]) %>%
+    mutate(
+      !!avg_col := cummean(.data[[lfdr_col]]),
+      !!rej_col := as.integer(.data[[avg_col]] < qval)
+    ) %>%
+    arrange(idx) %>%
+    select(-idx)
+}
+
+allResList <- list()
+rejTab <- data.frame()
+
+for (snp_it in 1:3) {
+  tempRoot <- file.path(outputDir, paste0("med_analysis_aID", snp_it))
   tempStatsDat <- fread(paste0(tempRoot, "_dat.txt")) %>%
     mutate(SNP = snp_it)
   
+  n_ref <- nrow(tempStatsDat)
   
-  if (file.exists(paste0(tempRoot, "_newlfdr.txt"))) { 
-    tempNewDat <- fread(paste0(tempRoot, "_newlfdr.txt")) %>%
-      mutate(idx = 1:nrow(.))  %>%
-      arrange(newLfdr) %>%
-      mutate(avgNew = cummean(newLfdr)) %>%
-      mutate(rejNew = ifelse(avgNew < qval, 1, 0)) %>%
-      arrange(idx) %>%
-      select(-idx, -Gene, -Z_eqtl, -Z_twas, -Z_eqtl1, -Z_twas1)
-  } else {tempNewDat <- data.frame(newLfdr=NA, rejNew=rep(0, nrow(tempStatsDat)), avgNew=NA)}
+  tempNewDat <- read_method_lfdr(
+    file_path = paste0(tempRoot, "_newlfdr.txt"),
+    lfdr_col = "newLfdr",
+    avg_col = "avgNew",
+    rej_col = "rejNew",
+    n_ref = n_ref,
+    keep_only_col = "newLfdr"
+  )
   
-  if (file.exists(paste0(tempRoot, "_kernel.txt"))) {
-    tempKernelDat <- fread(paste0(tempRoot, "_kernel.txt")) %>% set_colnames(c("kernelLfdr")) %>%
-      mutate(idx = 1:nrow(.)) %>% 
-      arrange(kernelLfdr) %>%
-      mutate(avgKernel = cummean(kernelLfdr)) %>%
-      mutate(rejKernel = ifelse(avgKernel < qval, 1, 0)) %>%
-      arrange(idx) %>%
-      select(-idx) 
-  } else {tempKernelDat <- data.frame(kernelLfdr=NA, rejKernel=rep(0, nrow(tempStatsDat)), avgKernel=NA)}
+  tempKernelDat <- read_method_lfdr(
+    file_path = paste0(tempRoot, "_kernel.txt"),
+    lfdr_col = "kernelLfdr",
+    avg_col = "avgKernel",
+    rej_col = "rejKernel",
+    n_ref = n_ref
+  )
   
-  if (file.exists(paste0(tempRoot, "df50.txt"))) { 
-    tempDf50Dat <- fread(paste0(tempRoot, "df50.txt")) %>% set_colnames(c("Df50Lfdr")) %>%
-      mutate(idx = 1:nrow(.)) %>%      
-      arrange(Df50Lfdr) %>%
-      mutate(avgDf50 = cummean(Df50Lfdr)) %>%
-      mutate(rejDf50 = ifelse(avgDf50 < qval, 1, 0)) %>%
-      arrange(idx) %>%
-      select(-idx) 
-  } else {tempDf50Dat <- data.frame(Df50Lfdr=NA, rejDf50=rep(0, nrow(tempStatsDat)), avgDf50=NA)}
+  tempDf50Dat <- read_method_lfdr(
+    file_path = paste0(tempRoot, "_df50.txt"),
+    lfdr_col = "Df50Lfdr",
+    avg_col = "avgDf50",
+    rej_col = "rejDf50",
+    n_ref = n_ref
+  )
   
-  if (file.exists(paste0(tempRoot, "_df7.txt"))) {
-    tempDf7Dat <- fread(paste0(tempRoot, "_df7.txt")) %>% set_colnames(c("Df7Lfdr")) %>%
-      mutate(idx = 1:nrow(.)) %>%      
-      arrange(Df7Lfdr) %>%
-      mutate(avgDf7 = cummean(Df7Lfdr)) %>%
-      mutate(rejDf7 = ifelse(avgDf7 < qval, 1, 0)) %>%
-      arrange(idx) %>%
-      select(-idx)   
-  } else {tempDf7Dat <- data.frame(Df7Lfdr=NA, rejDf7=rep(0, nrow(tempStatsDat)), avgDf7=NA)} 
+  tempDf7Dat <- read_method_lfdr(
+    file_path = paste0(tempRoot, "_df7.txt"),
+    lfdr_col = "Df7Lfdr",
+    avg_col = "avgDf7",
+    rej_col = "rejDf7",
+    n_ref = n_ref
+  )
   
+  tempdeibDat <- read_method_lfdr(
+    file_path = paste0(tempRoot, "_deib.txt"),
+    lfdr_col = "deibLfdr",
+    avg_col = "avgdeib",
+    rej_col = "rejdeib",
+    n_ref = n_ref
+  )
   
-  # put in list
-  fullDat <- cbind(tempStatsDat, tempNewDat, tempKernelDat, tempDf7Dat)  # df50 method can't work
+  tempmtestDat <- read_method_lfdr(
+    file_path = paste0(tempRoot, "_mtest.txt"),
+    lfdr_col = "mtestLfdr",
+    avg_col = "avgmtest",
+    rej_col = "rejmtest",
+    n_ref = n_ref
+  )
+  
+  fullDat <- bind_cols(
+    tempStatsDat, tempNewDat, tempKernelDat, tempDf7Dat, tempDf50Dat, tempdeibDat, tempmtestDat
+  )
+  
+  if (anyDuplicated(names(fullDat)) > 0) {
+    dup_names <- names(fullDat)[duplicated(names(fullDat))]
+    stop(paste("Duplicate columns in fullDat:", paste(unique(dup_names), collapse = ", ")))
+  }
+  
   allResList[[snp_it]] <- fullDat
   
-  # rejections
-  tempRej <- fullDat %>% filter( rejDf7 == 1 | rejNew == 1 | rejKernel == 1)
-  rejTab <- rbind(rejTab, tempRej)
+  tempRej <- fullDat %>%
+    filter(rejDf50 == 1 | rejDf7 == 1 | rejNew == 1 | rejKernel == 1 | rejdeib == 1 | rejmtest == 1)
   
-  cat(snp_it)
+  rejTab <- bind_rows(rejTab, tempRej)
+  cat("done SNP:", snp_it, "\n")
 }
 
-# look at rejections
-allRej <- rejTab %>% mutate(numRej = rejDf7 + rejNew + rejKernel, na.rm=TRUE) %>%
+allRej <- rejTab %>%
+  mutate(numRej = rowSums(across(c(rejDf50, rejDf7, rejNew, rejKernel, rejdeib, rejmtest)), na.rm = TRUE)) %>%
   arrange(desc(numRej)) %>%
   slice(1:5) %>%
-  select(Gene, Z_eqtl, Z_twas, Z_eqtl1, Z_twas1, numRej, SNP)
+  select(Gene, Z_eqtl, Z_twas, Z_eqtl1, Z_twas1, numRej, SNP, rejNew, rejNew, rejNew,
+         rejKernel, rejDf7, rejDf50, rejdeib, rejmtest)
 
-# merge with information
-tab2DF <- data.frame(RS = c("rs71658797", "rs6920364", "rs11780471",
-                            "rs55781567", "rs56113850", "rs13080835",
-                            "rs7705526", "rs4236709", "rs885518", "rs11591710",
-                            "rs1056562", "rs77468143", "rs41309931", "rs116822326",
-                            "rs7953330"),
-                     Locus = c("FUBP1", "RNASET2", "CHRNA2",
-                               "CHRNA5", "CYP2A6", "TP63", "TERT", "NRG1", "CDKN2A",
-                               "OBFC1", "AMICA1", "SECISBP2L", "RTEL1", "HCP5", "RAD52"),
-                     BP = c(77967507, 167376466, 27344719, 78857986,
-                            41353107, 189357199, 1285974, 32410110, 21830157, 105687632,
-                            118125625, 49376624, 62326579, 31434111, 998819),
-                     Chr = c(1, 6, 8, 15, 19, 3, 5, 8, 9, 10, 11, 15, 20, 6, 12), SNP=1:15)
+allRej1 <- rejTab %>%
+  mutate(numRej = rowSums(across(c(rejDf50, rejDf7, rejNew, rejKernel, rejdeib, rejmtest)), na.rm = TRUE)) %>%
+  arrange(desc(numRej)) %>%
+  select(Gene, Z_eqtl, Z_twas, Z_eqtl1, Z_twas1, numRej, SNP,
+         avgNew, rejNew, avgKernel, rejKernel, avgDf7, rejDf7, avgDf50, rejDf50, avgdeib, rejdeib, avgmtest, rejmtest)
 
-mergedRej <- merge(allRej, tab2DF, by="SNP") %>%
-  select(RS, Chr, BP, Locus, Gene, Z_eqtl, Z_twas, Z_eqtl1, Z_twas1, numRej)
+tab2DF <- data.frame(
+  RS = c("rs55781567", "rs56113850", "rs7705526"),
+  Gene = c("CHRNA5", "CYP2A6", "TERT"),
+  BP = c(78857986, 41353107, 1285974),
+  Chr = c(15, 19, 5),
+  SNP = 1:3
+)
 
-mergedRej
+# IMPORTANT: use left_join to avoid Gene.x / Gene.y collisions
+mergedRej <- allRej %>%
+  left_join(tab2DF %>% select(SNP, RS, Chr, BP), by = "SNP") %>%
+  arrange(desc(numRej)) %>%
+  select(RS, Chr, BP, Gene, Z_eqtl, Z_twas, Z_eqtl1, Z_twas1, numRej)
+
+print(mergedRej)
