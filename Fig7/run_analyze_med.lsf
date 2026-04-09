@@ -1,4 +1,4 @@
-#BSUB -J mediation[1-15]
+#BSUB -J mediation[1-3]
 #BSUB -W 3:00
 #BSUB -o /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig7/errDir/Fig7_data_log%I.out
 #BSUB -e /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig7/errDir/Fig7_data_%I.err
@@ -9,6 +9,6 @@
 #BSUB -M 4
 #BSUB -R rusage[mem=4]
 
-# run 1-15
+# run 1-3
 module load R/4.5.1
 Rscript /rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig7/two_mediation_analysis.R $LSB_JOBINDEX 1 >/rsrch8/home/biostatistics/zliu20/test/csmGmm_sim_R2/Fig7/errDir/Fig7_data_$LSB_JOBINDEX.out
