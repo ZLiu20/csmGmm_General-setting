@@ -235,31 +235,31 @@ Fig2A_data <- fread(paste0(outputDir, "/Fig2a_summary.txt"), data.table=F) %>%
   mutate(Method = ifelse(Method == "df7", "locfdr7df", Method)) %>%
   mutate(Method = ifelse(Method == "df50", "locfdr50df", Method)) %>%
   mutate(Method = ifelse(Method == "New", "csmGmm", Method)) %>%
-  mutate(Method = factor(Method, levels=c("csmGmm", "Kernel", "locfdr7df",
-                                          "locfdr50df")))  %>%
-  # filter(minEff1 >= 0.35 & minEff1 <= 0.59) %>%
+  mutate(Method = ifelse(Method == "DEIB", "DEI-B", Method)) %>%
+  mutate(Method = ifelse(Method == "MTEST", "MM-opt", Method)) %>%
+  mutate(Method = factor(Method, levels=c("csmGmm", "DEI-B", "Kernel", "locfdr7df", "locfdr50df", "MM-opt")))  %>%
+  filter(minEff1 >= 0 & minEff1 <= 0.25) %>%
   filter(!is.na(Method))
 
 # plot Figure 2A
 Fig2A_plot <- ggplot(data=Fig2A_data, aes(x=minEff1, y=FDP, group=Method)) +
   geom_line(aes(linetype = Method, color=Method),lwd=1.2) +
-  scale_color_manual(values=mycols[-c(2,6)]) +
-  scale_linetype_manual(values=c(1,2,3,4,5,6)[-c(2,6)]) +
+  scale_color_manual(values=mycols) +
+  scale_linetype_manual(values=1:6) +
   geom_hline(yintercept=0.1, linetype=2, color="grey") +
   ylab("FDP (4D Mediation)") +
   xlab("Min Effect Magnitude") +
-  ylim(c(0, 0.3)) + #xlim(c(0.12, 0.22)) +
+  ylim(c(0, 0.55)) + #xlim(c(0.12, 0.22)) +
   theme_cowplot() +
   theme(axis.title = element_text(size=20), axis.text = element_text(size=16)) +
   theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
   theme(legend.key.size = unit(3,"line"))
 
-
 # plot Figure 2C
 Fig2C_plot <- ggplot(data=Fig2A_data, aes(x=minEff1, y=Power, group=Method)) +
   geom_line(aes(linetype = Method, color=Method),lwd=1.2) +
-  scale_color_manual(values=mycols[-c(2,6)]) +
-  scale_linetype_manual(values=c(1,2,3,4,5,6)[-c(2,6)]) +
+  scale_color_manual(values=mycols) +
+  scale_linetype_manual(values=1:6) +
   # geom_hline(yintercept=0.1, linetype=2, color="grey") +
   ylab("Power (4D Mediation)") +
   xlab("Min Effect Magnitude") +
@@ -269,23 +269,39 @@ Fig2C_plot <- ggplot(data=Fig2A_data, aes(x=minEff1, y=Power, group=Method)) +
   theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
   theme(legend.key.size = unit(3,"line"))
 
-
+# plot Figure 2E
+Fig2E_plot <- ggplot(data=Fig2A_data, aes(x=minEff1, y=Incongruous, group=Method)) +
+  geom_line(aes(linetype = Method, color=Method),lwd=1.2) +
+  # scale_color_manual(values=mycols[-c(2,6)]) +
+  # scale_linetype_manual(values=c(1,2,3,4,5,6)[-c(2,6)]) +
+  scale_color_manual(values=mycols) +
+  scale_linetype_manual(values=1:6) +
+  # geom_hline(yintercept=0.1, linetype=2, color="grey") +
+  ylab("Power (4D Mediation)") +
+  xlab("Min Effect Magnitude") +
+  ylim(c(0, 2000)) + #xlim(c(0.12, 0.22)) +
+  theme_cowplot() +
+  theme(axis.title = element_text(size=20), axis.text = element_text(size=16)) +
+  theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
+  theme(legend.key.size = unit(3,"line"))
 
 # Figure 2B
 Fig2B_data <- fread(paste0(outputDir, "/Fig2b_summary.txt"), data.table=F) %>%
   mutate(Method = ifelse(Method == "df7", "locfdr7df", Method)) %>%
   mutate(Method = ifelse(Method == "df50", "locfdr50df", Method)) %>%
   mutate(Method = ifelse(Method == "New", "csmGmm", Method)) %>%
-  mutate(Method = factor(Method, levels=c("csmGmm", "Kernel", "locfdr7df",
-                                          "locfdr50df")))  %>%
+  mutate(Method = ifelse(Method == "DEIB", "DEI-B", Method)) %>%
+  mutate(Method = ifelse(Method == "MTEST", "MM-opt", Method)) %>%
+  mutate(Method = factor(Method, levels=c("csmGmm", "DEI-B", "Kernel", "locfdr7df",
+                                          "locfdr50df", "MM-opt")))  %>%
   # filter(minEff1 >= 0.35 & minEff1 <= 0.59) %>%
   filter(!is.na(Method))
 
 # plot Figure 2B
 Fig2B_plot <- ggplot(data=Fig2B_data, aes(x=minEff1, y=FDP, group=Method)) +
   geom_line(aes(linetype = Method, color=Method),lwd=1.2) +
-  scale_color_manual(values=mycols[-c(2,6)]) +
-  scale_linetype_manual(values=c(1,2,3,4,5,6)[-c(2,6)]) +
+  scale_color_manual(values=mycols) +
+  scale_linetype_manual(values=1:6) +
   geom_hline(yintercept=0.1, linetype=2, color="grey") +
   ylab("FDP (4D Mediationn)") +
   xlab("Min Effect Magnitude") +
@@ -296,47 +312,50 @@ Fig2B_plot <- ggplot(data=Fig2B_data, aes(x=minEff1, y=FDP, group=Method)) +
   theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
   theme(legend.key.size = unit(3,"line"))
 
-
 # plot Figure 2D
 Fig2D_plot <- ggplot(data=Fig2B_data, aes(x=minEff1, y=Power, group=Method)) +
-  geom_line(aes(linetype = Method, color=Method),lwd=1.2) +
-  scale_color_manual(values=mycols[-c(2,6)]) +
-  scale_linetype_manual(values=c(1,2,3,4,5,6)[-c(2,6)]) +
+  geom_line(aes(linetype = Method, color=Method),lwd=1.2) + 
+  scale_color_manual(values=mycols) +
+  scale_linetype_manual(values=1:6) +
   # geom_hline(yintercept=0.1, linetype=2, color="grey") +
   ylab("Power (4D Mediation)") +
   xlab("Min Effect Magnitude") +
-  ylim(c(0, 1.0)) + #xlim(c(0.02, 0.11)) +
+  ylim(c(0, 0.5)) + #xlim(c(0.02, 0.11)) +
   xlab(expression(paste(tau[1] ,"= Proportion of (", alpha[j] != 0, ", ", beta[j], "=0, ", gamma[j], "=0,", delta[j], "=0)"))) +
   theme_cowplot() +
   theme(axis.title = element_text(size=20), axis.text = element_text(size=16)) +
   theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
   theme(legend.key.size = unit(3,"line"))
 
+# plot Figure 2F
+Fig2F_plot <- ggplot(data=Fig2B_data, aes(x=minEff1, y=Incongruous, group=Method)) +
+  geom_line(aes(linetype = Method, color=Method),lwd=1.2) +
+  # scale_color_manual(values=mycols[-c(2,6)]) +
+  # scale_linetype_manual(values=c(1,2,3,4,5,6)[-c(2,6)]) +
+  scale_color_manual(values=mycols) +
+  scale_linetype_manual(values=1:6) +
+  # geom_hline(yintercept=0.1, linetype=2, color="grey") +
+  ylab("Power (4D Mediation)") +
+  xlab("Min Effect Magnitude") +
+  ylim(c(0, 5000)) + #xlim(c(0.12, 0.22)) +
+  theme_cowplot() +
+  theme(axis.title = element_text(size=20), axis.text = element_text(size=16)) +
+  theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
+  theme(legend.key.size = unit(3,"line"))
 
 
-# # put together figure 1
+# # put together figure 2
 Fig2_plot <- plot_grid(Fig2A_plot + theme(legend.position = "none"),
                        Fig2B_plot + theme(legend.position = "none"),
                        Fig2C_plot + theme(legend.position = "none"),
                        Fig2D_plot + theme(legend.position = "none"),
-                       labels=c("A", "B", "C", "D"), nrow=2, label_size=22)
+                       Fig2E_plot + theme(legend.position = "none"),
+                       Fig2F_plot + theme(legend.position = "none"),
+                       labels=c("A", "B", "C", "D", "E", "F"), nrow=3, label_size=22)
 # 
 # 
 Fig2_legend <- get_legend(Fig2A_plot +  theme(legend.direction="horizontal",
                                               legend.justification="center",legend.box.just="bottom"))
 # 
 plot_grid(Fig2_plot, Fig2_legend, ncol=1, rel_heights=c(1, 0.1))
-ggsave(paste0(outputDir, "/Fig2.pdf"), width=18, height=12)
-
-
-
-
-
-
-
-
-
-
-
-
-
+ggsave(paste0(outputDir, "/Fig2.pdf"), width=14, height=18)
