@@ -446,16 +446,16 @@ toBeSourced <- list.files(codePath, "\\.R$")
 purrr::map(paste0(codePath, "/", toBeSourced), source)
 
 # set output directory 
-outputDir <- here::here("Fig6", "output")
-outName <- paste0(outputDir, "/Fig6A_aID", aID, ".txt")
+outputDir <- here::here("Fig5", "output")
+outName <- paste0(outputDir, "/Fig5A_aID", aID, ".txt")
 
 # option to save or load intermediate data to save time,
 # set as FALSE for first run and then TRUE thereafter
 loadData <- FALSE
 saveData <- FALSE
 # these names are for if saveData <- TRUE
-testStatsName <- here::here(outputDir, "Fig6A_allZ")
-betaName <- here::here(outputDir, "Fig6A_allBeta")
+testStatsName <- here::here(outputDir, "Fig5A_allZ")
+betaName <- here::here(outputDir, "Fig5A_allBeta")
 
 # simulation parameters
 doHDMT <- FALSE
