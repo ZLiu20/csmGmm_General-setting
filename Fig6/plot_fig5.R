@@ -91,7 +91,6 @@ summarize_raw_R1 <- function(fullDat, full = FALSE, cor = FALSE, maxP = FALSE, F
 }
 
 
-
 # source the .R scripts from the SupportingCode/ folder 
 codePath <- c(here::here("SupportingCode"))
 toBeSourced <- list.files(codePath, "\\.R$")
