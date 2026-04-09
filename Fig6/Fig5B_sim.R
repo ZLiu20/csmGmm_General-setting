@@ -4,7 +4,7 @@
 # set the working directory to the folder that holds this Rscript, e.g.
 # setwd("/path/to/csmGmm_reproduce/Fig5/Fig5B_sim.R") or set the path after the -cwd flag
 # in the .lsf file, and then run again.
-here::i_am("Fig6/Fig5B_sim.R")
+here::i_am("Fig5/Fig5B_sim.R")
 
 # load libraries
 library(dplyr)
@@ -18,11 +18,15 @@ library(csmGmm)
 library(here)
 library(locfdr)
 library(Matrix)    
-#library(corpcor)   
+#library(corpcor) 
+library(qch)
+#library(adaFilter)
+library(adaFilter, lib.loc = "/rsrch8/home/biostatistics/zliu20/R/x86_64-pc-linux-gnu-library")
+
+
 
 
 ## Define the supporting functions (unchanged)
-
 ################################################################################
 find_max_means_R1 <- function(muInfo) {
   listLength <- length(muInfo)
@@ -275,11 +279,12 @@ check_incongruous <- function(zMatrix, lfdrVec) {
   return(badIdx)
 }
 
+#'
 find_2d <- function(x, allTestStats) {
   length(which(allTestStats[1:x, 1] < allTestStats[x, 1] & allTestStats[1:x, 2] < allTestStats[x, 2]))
 }
 
-
+#'
 find_3d <- function(x, allTestStats) {
   length(which(allTestStats[1:x, 1] < allTestStats[x, 1] & allTestStats[1:x, 2] < allTestStats[x, 2] &
                  allTestStats[1:x, 3] < allTestStats[x, 3]))
@@ -295,13 +300,13 @@ codePath <- c(here::here("SupportingCode"))
 toBeSourced <- list.files(codePath, "\\.R$")
 purrr::map(paste0(codePath, "/", toBeSourced), source)
 
-outputDir <- here::here("Fig6", "output")
-outName <- paste0(outputDir, "/Fig6B_aID", aID, ".txt")
+outputDir <- here::here("Fig5", "output")
+outName <- paste0(outputDir, "/Fig5B_aID", aID, ".txt")
 
 loadData <- FALSE
 saveData <- FALSE
-testStatsName <- here::here(outputDir, "Fig6B_allZ")
-betaName <- here::here(outputDir, "Fig6B_allBeta")
+testStatsName <- here::here(outputDir, "Fig5B_allZ")
+betaName <- here::here(outputDir, "Fig5B_allBeta")
 
 # Simulation parameters
 outcomeCor <- 0.1
@@ -311,6 +316,9 @@ doKernel <- TRUE
 do50df <- TRUE
 do7df <- TRUE
 doNew <- TRUE
+doQCH <- TRUE
+doAdaFilter <- TRUE
+
 qvalue <- 0.1
 nSNPs <- 10^5
 setSize <- 1000
@@ -356,13 +364,23 @@ gen_one_subject <- function(x, sigmaValsMat) {
   return(rmvbin(n=1, margprob=x, sigma=sigmaValsMat))
 }
 
+
+##' qch
+if (doQCH) {
+  Hconfig_qch <- qch::GetHconfig(nDims)
+  H1config_qch <- qch::GetH1AtLeast(Hconfig_qch, AtLeast = 2)
+  qch_test_name <- paste0("AtLeast_", 2)
+}
+
 # record results here
-powerRes <- data.frame(nCausal=rep(NA, nSims), minEff1=betaMin[1],
-                       seed=NA, pi0aTrue=NA, pi0bTrue=NA, pi0cTrue = NA,
-                       nRejDACT=NA, nRejHDMT=NA, nRejKernel=NA, nRej7df=NA, nRej50df=NA, nRejNew=NA,
-                       powerDACT=NA, powerHDMT=NA, powerKernel=NA, power7df=NA,
-                       power50df=NA, powerNew=NA, fdpDACT=NA, fdpHDMT=NA, fdpKernel=NA, fdp7df=NA, fdp50df=NA, fdpNew=NA,
-                       inconKernel=NA, incon7df=NA, incon50df=NA, inconNew=NA)
+powerRes <- data.frame(nCausal = rep(NA, nSims), minEff1 = betaMin[1], 
+                       seed = NA,pi0aTrue = NA, pi0bTrue = NA, pi0cTrue = NA,
+                       nRejDACT = NA, nRejHDMT = NA, nRejKernel = NA, nRej7df = NA, nRej50df = NA, nRejNew = NA,
+                       nRejQCH = NA, nRejAda = NA, powerDACT = NA, powerHDMT = NA, powerKernel = NA, power7df = NA, 
+                       power50df = NA, powerNew = NA, powerQCH = NA, powerAda = NA,fdpDACT = NA, fdpHDMT = NA, 
+                       fdpKernel = NA, fdp7df = NA, fdp50df = NA, fdpNew = NA, fdpQCH = NA, fdpAda = NA, 
+                       inconKernel = NA, incon7df = NA, incon50df = NA, inconNew = NA, inconQCH = NA, inconAda = NA)
+
 
 for (sim_it in 1:nSims) {
   set.seed(aID * 10^5 + sim_it)
@@ -448,8 +466,13 @@ for (sim_it in 1:nSims) {
   allP <- 1- pchisq(as.matrix(allZ)^2, df=1)
   
   # hold the results
-  totOut <- data.frame(X1 = allP[, 1], X2 = allP[, 2], origIdx = 1:nrow(allP), causal=causalVec) %>%
-    mutate(pmax = pmax(X1, X2))
+  # totOut <- data.frame(X1 = allP[, 1], X2 = allP[, 2], origIdx = 1:nrow(allP), causal=causalVec) %>%
+  #   mutate(pmax = pmax(X1, X2))
+  
+  totOut <- data.frame(X1 = allP[, 1], X2 = allP[, 2], X3 = allP[, 3], origIdx = 1:nrow(allP), causal=causalVec)%>%
+    mutate(pmax = pmax(X1, X2, X3))
+  
+
   
   # analyze it 
   # start with HDMT
@@ -499,7 +522,143 @@ for (sim_it in 1:nSims) {
       powerRes$nRejDACT[sim_it] <- length(which(totOut$DACTrej == 1))
     }
   } else {totOut <-  totOut %>% mutate(DACTp = NA, DACTrej = NA)}
+
+
+
+# -----------------------------
+  # qch method (AtLeast = 2)
+  # -----------------------------
+  if (doQCH) {
+    pmat <- as.matrix(allP)
+    pmat[!is.finite(pmat)] <- 1
+    pmat <- pmin(pmax(pmat, 0), 1)
+    
+    qch_out <- tryCatch({
+      qch_fit <- qch::qch.fit(
+        pValMat = as.data.frame(pmat),
+        Hconfig = Hconfig_qch,
+        copula = "gaussian",
+        plotting = FALSE
+      )
+      qch_res <- qch::qch.test(
+        res.qch.fit = qch_fit,
+        Hconfig = Hconfig_qch,
+        Hconfig.H1 = H1config_qch,   # AtLeast_2
+        Alpha = qvalue
+      )
+      
+      qch_lfdr <- qch_res$lFDR[[qch_test_name]]
+      
+      if (!is.null(qch_lfdr) && length(qch_lfdr) == nrow(totOut)) {
+        qch_lfdr <- as.numeric(qch_lfdr)
+        qch_lfdr[!is.finite(qch_lfdr)] <- 1
+        qch_lfdr <- pmin(pmax(qch_lfdr, 0), 1)
+        
+        totOut <- totOut %>%
+          mutate(qchLfdr = qch_lfdr) %>%
+          arrange(qchLfdr) %>%
+          mutate(qchAvg = cummean(qchLfdr)) %>%
+          arrange(origIdx)
+        
+        rej <- as.integer(totOut$qchAvg < qvalue)
+        incon_val <- length(check_incongruous(zMatrix = allZ, lfdrVec = qch_lfdr))
+      } else {
+        decision <- qch_res$Rejection[[qch_test_name]]
+        if (is.null(decision)) stop("qch decision is NULL")
+        
+        rej <- as.integer(decision == 1)
+        totOut <- totOut %>% mutate(qchLfdr = NA_real_, qchAvg = NA_real_)
+        incon_val <- NA
+      }
+      
+      nRej <- sum(rej)
+      list(
+        nRej  = nRej,
+        power = ifelse(sum(causalVec) > 0, sum(rej == 1 & causalVec == 1) / sum(causalVec), 0),
+        fdp   = ifelse(nRej > 0, sum(rej == 1 & causalVec == 0) / nRej, 0),
+        incon = incon_val
+      )
+    }, error = function(e) {
+      totOut <<- totOut %>% mutate(qchLfdr = NA_real_, qchAvg = NA_real_)
+      list(nRej = NA, power = NA, fdp = NA, incon = NA)
+    })
+    
+    powerRes$nRejQCH[sim_it]  <- qch_out$nRej
+    powerRes$powerQCH[sim_it] <- qch_out$power
+    powerRes$fdpQCH[sim_it]   <- qch_out$fdp
+    powerRes$inconQCH[sim_it] <- qch_out$incon
+  } else {
+    totOut <- totOut %>% mutate(qchLfdr = NA_real_, qchAvg = NA_real_)
+    powerRes$inconQCH[sim_it] <- NA
+  }
   
+  # -----------------------------
+  # adaFilter method (r = 2)
+  # -----------------------------
+  if (doAdaFilter) {
+    pmat <- as.matrix(allP)
+    pmat[!is.finite(pmat)] <- 1
+    pmat <- pmin(pmax(pmat, 0), 1)
+    
+    ada_out <- tryCatch(
+      adaFilter::adaFilter(pmat, r = 2),
+      error = function(e) NULL
+    )
+    
+    if (!is.null(ada_out) && !is.null(ada_out$adjusted.p)) {
+      adjp <- as.numeric(ada_out$adjusted.p)
+      
+      if (length(adjp) == nrow(totOut)) {
+        adjp[!is.finite(adjp)] <- 1
+        adjp <- pmin(pmax(adjp, 0), 1)
+        
+        totOut <- totOut %>%
+          mutate(adaLfdr = adjp) %>%
+          arrange(adaLfdr) %>%
+          mutate(adaAvg = cummean(adaLfdr)) %>%
+          arrange(origIdx)
+        
+        nRejAda <- length(which(totOut$adaAvg < qvalue))
+        nCausal <- sum(causalVec)
+        
+        powerRes$nRejAda[sim_it]  <- nRejAda
+        powerRes$fdpAda[sim_it]   <- ifelse(nRejAda > 0,
+                                            sum(totOut$adaAvg < qvalue & totOut$causal == 0) / nRejAda, 0)
+        powerRes$powerAda[sim_it] <- ifelse(nCausal > 0,
+                                            sum(totOut$adaAvg < qvalue & totOut$causal == 1) / nCausal, 0)
+        powerRes$inconAda[sim_it] <- length(check_incongruous(zMatrix = allZ, lfdrVec = adjp))
+      } else {
+        totOut <- totOut %>% mutate(adaLfdr = NA_real_, adaAvg = NA_real_)
+        powerRes$nRejAda[sim_it]  <- NA
+        powerRes$powerAda[sim_it] <- NA
+        powerRes$fdpAda[sim_it]   <- NA
+        powerRes$inconAda[sim_it] <- NA
+      }
+      
+    } else if (!is.null(ada_out) && !is.null(ada_out$decision) &&
+               length(ada_out$decision) == nrow(totOut)) {
+      ada_rej <- as.integer(ada_out$decision == 1)
+      nRejAda <- sum(ada_rej)
+      nCausal <- sum(causalVec)
+      
+      totOut <- totOut %>% mutate(adaLfdr = NA_real_, adaAvg = NA_real_)
+      powerRes$nRejAda[sim_it]  <- nRejAda
+      powerRes$fdpAda[sim_it]   <- ifelse(nRejAda > 0, sum(ada_rej == 1 & causalVec == 0) / nRejAda, 0)
+      powerRes$powerAda[sim_it] <- ifelse(nCausal > 0, sum(ada_rej == 1 & causalVec == 1) / nCausal, 0)
+      powerRes$inconAda[sim_it] <- NA
+    } else {
+      totOut <- totOut %>% mutate(adaLfdr = NA_real_, adaAvg = NA_real_)
+      powerRes$nRejAda[sim_it]  <- NA
+      powerRes$powerAda[sim_it] <- NA
+      powerRes$fdpAda[sim_it]   <- NA
+      powerRes$inconAda[sim_it] <- NA
+    }
+  } else {
+    totOut <- totOut %>% mutate(adaLfdr = NA_real_, adaAvg = NA_real_)
+    powerRes$inconAda[sim_it] <- NA
+  }
+
+                        
   
   # Kernel, 7df, 50df, New method — all support nDims
   if (doKernel) {
@@ -532,7 +691,8 @@ for (sim_it in 1:nSims) {
   #     powerRes$nRejKernel[sim_it] <- length(rej_idx)
   #   }
   # }
-  
+
+  ##'7df
   if (do7df) {
     oldRes7df <- emp_bayes_framework_R1(t_value = t, summary_tab = allZ, kernel = FALSE, joint=FALSE, ind = TRUE,
                                         dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=FALSE)
@@ -563,7 +723,8 @@ for (sim_it in 1:nSims) {
   #     powerRes$nRej7df[sim_it] <- length(rej_idx)
   #   }
   # }
-  
+
+  ##' 50df
   if (do50df) {
     oldRes50df <- emp_bayes_framework_R1(t_value = t, summary_tab = allZ, kernel = FALSE, joint=FALSE, ind = TRUE,
                                          dfFit = 50, Hdist_epsilon=10^(-2), checkpoint=FALSE)
