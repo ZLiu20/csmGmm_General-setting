@@ -16,17 +16,20 @@ library(csmGmm)
 library(here)
 
 
+# Function to summarize raw results
 summarize_raw_R1 <- function(fullDat, full = FALSE, cor = FALSE, maxP = FALSE, FDP2 = FALSE) {
-  safe_mean <- function(x) {
-    if (all(is.na(x))) NA_real_ else mean(x, na.rm = TRUE)
-  }
-  
-  out_list <- list()
+  outDF <- data.frame()
   effSizes <- sort(unique(fullDat$minEff1))
   
-  for (i in seq_along(effSizes)) {
-    tempEff <- effSizes[i]
-    
+  needed <- c(
+    "nRejDACT","nRejHDMT","nRejKernel","nRej7df","nRej50df","nRejNew","nRejQCH","nRejAda",
+    "powerDACT","powerHDMT","powerKernel","power7df","power50df","powerNew","powerQCH","powerAda",
+    "fdpDACT","fdpHDMT","fdpKernel","fdp7df","fdp50df","fdpNew","fdpQCH","fdpAda",
+    "inconKernel","incon7df","incon50df","inconNew"
+  )
+  for (nm in needed) if (!nm %in% names(fullDat)) fullDat[[nm]] <- NA_real_
+  
+  for (tempEff in effSizes) {
     tempDat <- fullDat %>%
       dplyr::filter(minEff1 == tempEff) %>%
       as.data.frame() %>%
@@ -37,142 +40,54 @@ summarize_raw_R1 <- function(fullDat, full = FALSE, cor = FALSE, maxP = FALSE, F
         fdp7df    = ifelse(nRej7df    == 0, 0, fdp7df),
         fdp50df   = ifelse(nRej50df   == 0, 0, fdp50df),
         fdpNew    = ifelse(nRejNew    == 0, 0, fdpNew),
-        fdpDEIB   = ifelse(nRejDEIB   == 0, 0, fdpDEIB),
-        fdpMTEST  = ifelse(nRejMTEST  == 0, 0, fdpMTEST)
+        fdpQCH    = ifelse(nRejQCH    == 0, 0, fdpQCH),
+        fdpAda    = ifelse(nRejAda    == 0, 0, fdpAda)
       )
     
-    if (cor) {
-      tempDat <- tempDat %>%
-        dplyr::mutate(
-          fdpCor = ifelse(nRejCor == 0, 0, fdpCor),
-          fdpNew = fdpCor, powerNew = powerCor, nRejNew = nRejCor
-        )
-    }
+    methods <- if (maxP) c("MaxP","DACT","HDMT","Kernel","df7","df50","New","QCH","Ada") else
+      c("DACT","HDMT","Kernel","df7","df50","New","QCH","Ada")
     
-    if (full) {
-      tempDat <- tempDat %>%
-        dplyr::mutate(
-          fdpFull = ifelse(nRejFull == 0, 0, fdpFull),
-          fdpDACT = fdpFull, powerDACT = powerFull, nRejDACT = nRejFull
-        )
-    }
+    summaryOut <- data.frame(minEff1 = tempDat$minEff1[1], Method = methods)
     
     if (maxP) {
-      methods <- c("MaxP", "DACT", "HDMT", "Kernel", "df7", "df50", "New", "DEIB", "MTEST")
-      
-      summaryOut <- data.frame(
-        minEff1 = tempDat$minEff1[1],
-        Method = methods,
-        stringsAsFactors = FALSE
-      )
-      
-      summaryOut$nRej <- c(
-        safe_mean(tempDat$nRejMaxp), safe_mean(tempDat$nRejDACT), safe_mean(tempDat$nRejHDMT),
-        safe_mean(tempDat$nRejKernel), safe_mean(tempDat$nRej7df), safe_mean(tempDat$nRej50df),
-        safe_mean(tempDat$nRejNew), safe_mean(tempDat$nRejDEIB), safe_mean(tempDat$nRejMTEST)
-      )
-      
-      summaryOut$Power <- c(
-        safe_mean(tempDat$powerMaxp), safe_mean(tempDat$powerDACT), safe_mean(tempDat$powerHDMT),
-        safe_mean(tempDat$powerKernel), safe_mean(tempDat$power7df), safe_mean(tempDat$power50df),
-        safe_mean(tempDat$powerNew), safe_mean(tempDat$powerDEIB), safe_mean(tempDat$powerMTEST)
-      )
-      
-      summaryOut$FDP <- c(
-        safe_mean(tempDat$fdpMaxp), safe_mean(tempDat$fdpDACT), safe_mean(tempDat$fdpHDMT),
-        safe_mean(tempDat$fdpKernel), safe_mean(tempDat$fdp7df), safe_mean(tempDat$fdp50df),
-        safe_mean(tempDat$fdpNew), safe_mean(tempDat$fdpDEIB), safe_mean(tempDat$fdpMTEST)
-      )
-      
-      summaryOut$Incongruous <- c(
-        NA_real_, NA_real_, NA_real_,
-        safe_mean(tempDat$inconKernel), safe_mean(tempDat$incon7df),
-        safe_mean(tempDat$incon50df), safe_mean(tempDat$inconNew),
-        safe_mean(tempDat$inconDEIB), safe_mean(tempDat$inconMTEST)
-      )
-      
-      summaryOut$numNA <- c(
-        sum(is.na(tempDat$powerMaxp)), sum(is.na(tempDat$powerDACT)), sum(is.na(tempDat$powerHDMT)),
-        sum(is.na(tempDat$powerKernel)), sum(is.na(tempDat$power7df)), sum(is.na(tempDat$power50df)),
-        sum(is.na(tempDat$powerNew)), sum(is.na(tempDat$powerDEIB)), sum(is.na(tempDat$powerMTEST))
-      )
-      
-      if (FDP2) {
-        summaryOut$sig2Pow <- c(
-          NA_real_, safe_mean(tempDat$sig2PowDACT), safe_mean(tempDat$sig2PowHDMT),
-          safe_mean(tempDat$sig2PowKernel), safe_mean(tempDat$sig2Pow7df),
-          safe_mean(tempDat$sig2Pow50df), safe_mean(tempDat$sig2PowNew),
-          safe_mean(tempDat$sig2PowDEIB), safe_mean(tempDat$sig2PowMTEST)
-        )
-        
-        summaryOut$sig2FDb.P <- c(
-          NA_real_, safe_mean(tempDat$sig2fdpDACT), safe_mean(tempDat$sig2fdpHDMT),
-          safe_mean(tempDat$sig2fdpKernel), safe_mean(tempDat$sig2fdp7df),
-          safe_mean(tempDat$sig2fdp50df), safe_mean(tempDat$sig2fdpNew),
-          safe_mean(tempDat$sig2fdpDEIB), safe_mean(tempDat$sig2fdpMTEST)
-        )
-      }
-      
+      summaryOut$nRej <- c(mean(tempDat$nRejMaxp, na.rm=TRUE), mean(tempDat$nRejDACT, na.rm=TRUE), mean(tempDat$nRejHDMT, na.rm=TRUE),
+                           mean(tempDat$nRejKernel, na.rm=TRUE), mean(tempDat$nRej7df, na.rm=TRUE), mean(tempDat$nRej50df, na.rm=TRUE),
+                           mean(tempDat$nRejNew, na.rm=TRUE), mean(tempDat$nRejQCH, na.rm=TRUE), mean(tempDat$nRejAda, na.rm=TRUE))
+      summaryOut$Power <- c(mean(tempDat$powerMaxp, na.rm=TRUE), mean(tempDat$powerDACT, na.rm=TRUE), mean(tempDat$powerHDMT, na.rm=TRUE),
+                            mean(tempDat$powerKernel, na.rm=TRUE), mean(tempDat$power7df, na.rm=TRUE), mean(tempDat$power50df, na.rm=TRUE),
+                            mean(tempDat$powerNew, na.rm=TRUE), mean(tempDat$powerQCH, na.rm=TRUE), mean(tempDat$powerAda, na.rm=TRUE))
+      summaryOut$FDP <- c(mean(tempDat$fdpMaxp, na.rm=TRUE), mean(tempDat$fdpDACT, na.rm=TRUE), mean(tempDat$fdpHDMT, na.rm=TRUE),
+                          mean(tempDat$fdpKernel, na.rm=TRUE), mean(tempDat$fdp7df, na.rm=TRUE), mean(tempDat$fdp50df, na.rm=TRUE),
+                          mean(tempDat$fdpNew, na.rm=TRUE), mean(tempDat$fdpQCH, na.rm=TRUE), mean(tempDat$fdpAda, na.rm=TRUE))
+      summaryOut$Incongruous <- c(NA, NA, NA, mean(tempDat$inconKernel, na.rm=TRUE), mean(tempDat$incon7df, na.rm=TRUE),
+                                  mean(tempDat$incon50df, na.rm=TRUE), mean(tempDat$inconNew, na.rm=TRUE), 
+                                  mean(tempDat$inconQCH, na.rm=TRUE), mean(tempDat$inconAda, na.rm=TRUE))
+      summaryOut$numNA <- c(length(which(is.na(tempDat$powerMaxp))), length(which(is.na(tempDat$powerDACT))), length(which(is.na(tempDat$powerHDMT))),
+                            length(which(is.na(tempDat$powerKernel))), length(which(is.na(tempDat$power7df))), length(which(is.na(tempDat$power50df))),
+                            length(which(is.na(tempDat$powerNew))), length(which(is.na(tempDat$powerQCH))), length(which(is.na(tempDat$powerAda))))
     } else {
-      methods <- c("DACT", "HDMT", "Kernel", "df7", "df50", "New", "DEIB", "MTEST")
-      
-      summaryOut <- data.frame(
-        minEff1 = tempDat$minEff1[1],
-        Method = methods,
-        stringsAsFactors = FALSE
-      )
-      
-      summaryOut$nRej <- c(
-        safe_mean(tempDat$nRejDACT), safe_mean(tempDat$nRejHDMT), safe_mean(tempDat$nRejKernel),
-        safe_mean(tempDat$nRej7df), safe_mean(tempDat$nRej50df), safe_mean(tempDat$nRejNew),
-        safe_mean(tempDat$nRejDEIB), safe_mean(tempDat$nRejMTEST)
-      )
-      
-      summaryOut$Power <- c(
-        safe_mean(tempDat$powerDACT), safe_mean(tempDat$powerHDMT), safe_mean(tempDat$powerKernel),
-        safe_mean(tempDat$power7df), safe_mean(tempDat$power50df), safe_mean(tempDat$powerNew),
-        safe_mean(tempDat$powerDEIB), safe_mean(tempDat$powerMTEST)
-      )
-      
-      summaryOut$FDP <- c(
-        safe_mean(tempDat$fdpDACT), safe_mean(tempDat$fdpHDMT), safe_mean(tempDat$fdpKernel),
-        safe_mean(tempDat$fdp7df), safe_mean(tempDat$fdp50df), safe_mean(tempDat$fdpNew),
-        safe_mean(tempDat$fdpDEIB), safe_mean(tempDat$fdpMTEST)
-      )
-      
-      summaryOut$Incongruous <- c(
-        NA_real_, NA_real_, safe_mean(tempDat$inconKernel), safe_mean(tempDat$incon7df),
-        safe_mean(tempDat$incon50df), safe_mean(tempDat$inconNew), 
-        safe_mean(tempDat$inconDEIB), safe_mean(tempDat$inconMTEST)
-      )
-      
-      summaryOut$numNA <- c(
-        sum(is.na(tempDat$powerDACT)), sum(is.na(tempDat$powerHDMT)), sum(is.na(tempDat$powerKernel)),
-        sum(is.na(tempDat$power7df)), sum(is.na(tempDat$power50df)), sum(is.na(tempDat$powerNew)),
-        sum(is.na(tempDat$powerDEIB)), sum(is.na(tempDat$powerMTEST))
-      )
-      
-      if (FDP2) {
-        summaryOut$sig2Pow <- c(
-          safe_mean(tempDat$sig2PowDACT), safe_mean(tempDat$sig2PowHDMT), safe_mean(tempDat$sig2PowKernel),
-          safe_mean(tempDat$sig2Pow7df), safe_mean(tempDat$sig2Pow50df), safe_mean(tempDat$sig2PowNew),
-          safe_mean(tempDat$sig2PowDEIB), safe_mean(tempDat$sig2PowMTEST)
-        )
-        
-        summaryOut$sig2FDb.P <- c(
-          safe_mean(tempDat$sig2fdpDACT), safe_mean(tempDat$sig2fdpHDMT), safe_mean(tempDat$sig2fdpKernel),
-          safe_mean(tempDat$sig2fdp7df), safe_mean(tempDat$sig2fdp50df), safe_mean(tempDat$sig2fdpNew),
-          safe_mean(tempDat$sig2fdpDEIB), safe_mean(tempDat$sig2fdpMTEST)
-        )
-      }
+      summaryOut$nRej <- c(mean(tempDat$nRejDACT, na.rm=TRUE), mean(tempDat$nRejHDMT, na.rm=TRUE), mean(tempDat$nRejKernel, na.rm=TRUE),
+                           mean(tempDat$nRej7df, na.rm=TRUE), mean(tempDat$nRej50df, na.rm=TRUE), mean(tempDat$nRejNew, na.rm=TRUE),
+                           mean(tempDat$nRejQCH, na.rm=TRUE), mean(tempDat$nRejAda, na.rm=TRUE))
+      summaryOut$Power <- c(mean(tempDat$powerDACT, na.rm=TRUE), mean(tempDat$powerHDMT, na.rm=TRUE), mean(tempDat$powerKernel, na.rm=TRUE),
+                            mean(tempDat$power7df, na.rm=TRUE), mean(tempDat$power50df, na.rm=TRUE), mean(tempDat$powerNew, na.rm=TRUE),
+                            mean(tempDat$powerQCH, na.rm=TRUE), mean(tempDat$powerAda, na.rm=TRUE))
+      summaryOut$FDP <- c(mean(tempDat$fdpDACT, na.rm=TRUE), mean(tempDat$fdpHDMT, na.rm=TRUE), mean(tempDat$fdpKernel, na.rm=TRUE),
+                          mean(tempDat$fdp7df, na.rm=TRUE), mean(tempDat$fdp50df, na.rm=TRUE), mean(tempDat$fdpNew, na.rm=TRUE),
+                          mean(tempDat$fdpQCH, na.rm=TRUE), mean(tempDat$fdpAda, na.rm=TRUE))
+      summaryOut$Incongruous <- c(NA, NA, mean(tempDat$inconKernel, na.rm=TRUE), mean(tempDat$incon7df, na.rm=TRUE),
+                                  mean(tempDat$incon50df, na.rm=TRUE), mean(tempDat$inconNew, na.rm=TRUE), 
+                                  mean(tempDat$inconQCH, na.rm=TRUE), mean(tempDat$inconAda, na.rm=TRUE))
+      summaryOut$numNA <- c(length(which(is.na(tempDat$powerDACT))), length(which(is.na(tempDat$powerHDMT))), length(which(is.na(tempDat$powerKernel))),
+                            length(which(is.na(tempDat$power7df))), length(which(is.na(tempDat$power50df))), length(which(is.na(tempDat$powerNew))),
+                            length(which(is.na(tempDat$powerQCH))), length(which(is.na(tempDat$powerAda))))
     }
     
-    out_list[[i]] <- summaryOut
+    outDF <- rbind(outDF, summaryOut)
   }
   
-  dplyr::bind_rows(out_list)
+  outDF
 }
-
 
 # source the .R scripts from the SupportingCode/ folder 
 codePath <- c(here::here("SupportingCode"))
@@ -183,8 +98,8 @@ purrr::map(paste0(codePath, "/", toBeSourced), source)
 outputDir <- here::here("Fig3", "output")
 
 ##output
-names1a <- here::here(outputDir, paste0("Fig3A_aID", 221:720, ".txt"))
-names1b <- here::here(outputDir, paste0("Fig3B_aID", 1:200, ".txt"))
+names3a <- here::here(outputDir, paste0("Fig1A_aID", 142:1000, ".txt"))
+names3b <- here::here(outputDir, paste0("Fig1B_aID", 1:400, ".txt"))
 
 #-----------------------------------------#
 
@@ -197,6 +112,7 @@ for (file_it in 1:length(names3a)) {
   res3a <- rbindlist(tempList)
 }
 
+
 # Read 3b
 res3b <- c()
 for (file_it in 1:length(names3b)) {
@@ -208,8 +124,8 @@ for (file_it in 1:length(names3b)) {
 
 
 # summarize
-summary3a <- summarize_raw(res3a)
-summary3b <- summarize_raw(res3b)
+summary3a <- summarize_raw_R1(res3a)
+summary3b <- summarize_raw_R1(res3b)
 
 # save summaries
 write.table(summary3a, paste0(outputDir, "/Fig3a_summary.txt"), append=F,quote=F, row.names=F, col.names=T, sep='\t')
@@ -232,21 +148,25 @@ Fig3A_data <- fread(paste0(outputDir, "/Fig3a_summary.txt"), data.table=F) %>%
   mutate(Method = ifelse(Method == "df7", "locfdr7df", Method)) %>%
   mutate(Method = ifelse(Method == "df50", "locfdr50df", Method)) %>%
   mutate(Method = ifelse(Method == "New", "csmGmm", Method)) %>%
-  mutate(Method = ifelse(Method == "DEIB", "DEI-B", Method)) %>%
-  mutate(Method = ifelse(Method == "MTEST", "MM-opt", Method)) %>%
-  mutate(Method = factor(Method, levels=c("csmGmm", "DEI-B", "Kernel", "locfdr7df", "locfdr50df", "MM-opt")))  %>%
-  filter(minEff1 >= 0 & minEff1 <= 0.25) %>%
+  mutate(Method = ifelse(Method == "QCH", "qch_copula", Method)) %>%
+  mutate(Method = ifelse(Method == "Ada", "adaFilter", Method)) %>%
+  mutate(Method = factor(Method, levels=c("csmGmm", "adaFilter", "Kernel", "locfdr7df",
+                                          "locfdr50df", "qch_copula")))  %>%
+  # filter(minEff1 >= 0. & minEff1 <= 0.35) %>%
   filter(!is.na(Method))
+
 
 # plot Figure 3A
 Fig3A_plot <- ggplot(data=Fig3A_data, aes(x=minEff1, y=FDP, group=Method)) +
   geom_line(aes(linetype = Method, color=Method),lwd=1.2) +
+  # scale_color_manual(values=mycols[-c(2,6)]) +
+  # scale_linetype_manual(values=c(1,2,3,4,5,6)[-c(2,6)]) +
   scale_color_manual(values=mycols) +
   scale_linetype_manual(values=1:6) +
   geom_hline(yintercept=0.1, linetype=2, color="grey") +
-  ylab("FDP (4D Mediation)") +
+  ylab("FDP (3D Pleiotropy)") +
   xlab("Min Effect Magnitude") +
-  ylim(c(0, 0.55)) + #xlim(c(0.12, 0.22)) +
+  ylim(c(0, 0.4)) + #xlim(c(0.26, 0.48)) +
   theme_cowplot() +
   theme(axis.title = element_text(size=20), axis.text = element_text(size=16)) +
   theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
@@ -255,16 +175,19 @@ Fig3A_plot <- ggplot(data=Fig3A_data, aes(x=minEff1, y=FDP, group=Method)) +
 # plot Figure 3C
 Fig3C_plot <- ggplot(data=Fig3A_data, aes(x=minEff1, y=Power, group=Method)) +
   geom_line(aes(linetype = Method, color=Method),lwd=1.2) +
+  # scale_color_manual(values=mycols[-c(2,6)]) +
+  # scale_linetype_manual(values=c(1,2,3,4,5,6)[-c(2,6)]) +
   scale_color_manual(values=mycols) +
   scale_linetype_manual(values=1:6) +
-  # geom_hline(yintercept=0.1, linetype=2, color="grey") +
-  ylab("Power (4D Mediation)") +
+  #geom_hline(yintercept=0.1, linetype=2, color="grey") +
+  ylab("Power (3D Pleiotropy)") +
   xlab("Min Effect Magnitude") +
-  ylim(c(0, 1.0)) + #xlim(c(0.12, 0.22)) +
+  ylim(c(0, 1.0)) + #xlim(c(0.26, 0.48)) +
   theme_cowplot() +
   theme(axis.title = element_text(size=20), axis.text = element_text(size=16)) +
   theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
   theme(legend.key.size = unit(3,"line"))
+
 
 # plot Figure 3E
 Fig3E_plot <- ggplot(data=Fig3A_data, aes(x=minEff1, y=Incongruous, group=Method)) +
@@ -273,62 +196,60 @@ Fig3E_plot <- ggplot(data=Fig3A_data, aes(x=minEff1, y=Incongruous, group=Method
   # scale_linetype_manual(values=c(1,2,3,4,5,6)[-c(2,6)]) +
   scale_color_manual(values=mycols) +
   scale_linetype_manual(values=1:6) +
-  # geom_hline(yintercept=0.1, linetype=2, color="grey") +
-  ylab("Power (4D Mediation)") +
+  #geom_hline(yintercept=0.1, linetype=2, color="grey") +
+  ylab("Power (3D Pleiotropy)") +
   xlab("Min Effect Magnitude") +
-  ylim(c(0, 2000)) + #xlim(c(0.12, 0.22)) +
+  ylim(c(0, 4000)) + #xlim(c(0.26, 0.48)) +
   theme_cowplot() +
   theme(axis.title = element_text(size=20), axis.text = element_text(size=16)) +
   theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
   theme(legend.key.size = unit(3,"line"))
+
 
 # Figure 3B
 Fig3B_data <- fread(paste0(outputDir, "/Fig3b_summary.txt"), data.table=F) %>%
   mutate(Method = ifelse(Method == "df7", "locfdr7df", Method)) %>%
   mutate(Method = ifelse(Method == "df50", "locfdr50df", Method)) %>%
   mutate(Method = ifelse(Method == "New", "csmGmm", Method)) %>%
-  mutate(Method = ifelse(Method == "DEIB", "DEI-B", Method)) %>%
-  mutate(Method = ifelse(Method == "MTEST", "MM-opt", Method)) %>%
-  mutate(Method = factor(Method, levels=c("csmGmm", "DEI-B", "Kernel", "locfdr7df",
-                                          "locfdr50df", "MM-opt")))  %>%
-  # filter(minEff1 >= 0.35 & minEff1 <= 0.59) %>%
+  mutate(Method = ifelse(Method == "QCH", "qch_copula", Method)) %>%
+  mutate(Method = ifelse(Method == "Ada", "adaFilter", Method)) %>%
+  mutate(Method = factor(Method, levels=c("csmGmm", "adaFilter", "Kernel", "locfdr7df",
+                                          "locfdr50df", "qch_copula")))  %>%
+  #filter(minEff1 <= 0.08) %>%
   filter(!is.na(Method))
 
 # plot Figure 3B
 Fig3B_plot <- ggplot(data=Fig3B_data, aes(x=minEff1, y=FDP, group=Method)) +
   geom_line(aes(linetype = Method, color=Method),lwd=1.2) +
+  # scale_color_manual(values=mycols[-c(2,6)]) +
+  # scale_linetype_manual(values=c(1,2,3,4,5,6)[-c(2,6)]) +
   scale_color_manual(values=mycols) +
   scale_linetype_manual(values=1:6) +
   geom_hline(yintercept=0.1, linetype=2, color="grey") +
-  ylab("FDP (4D Mediationn)") +
-  xlab("Min Effect Magnitude") +
-  ylim(c(0, 0.3)) + #xlim(c(0.02, 0.11)) +
-  xlab(expression(paste(tau[1] ,"= Proportion of (", alpha[j] != 0, ", ", beta[j], "=0, ", gamma[j], "=0,", delta[j], "=0)"))) +
+  ylab("FDP (3D Pleiotropy)") +
+  ylim(c(0, 0.3)) + #xlim(c(0.01, 0.03 )) +
+  xlab(expression(paste(tau[1] ,"= Proportion of (", alpha[j] != 0, ", ", beta[j], "=0, ", gamma[j], "=0)"))) +
   theme_cowplot() +
   theme(axis.title = element_text(size=20), axis.text = element_text(size=16)) +
-  theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
+  theme(legend.title = element_text(size=20), legend.text = element_text(size=18))+
   theme(legend.key.size = unit(3,"line"))
 
 # plot Figure 3D
 Fig3D_plot <- ggplot(data=Fig3B_data, aes(x=minEff1, y=Power, group=Method)) +
   geom_line(aes(linetype = Method, color=Method),lwd=1.2) + 
+  # scale_color_manual(values=mycols[-c(2,6)]) +
+  # scale_linetype_manual(values=c(1,2,3,4,5,6)[-c(2,6)]) +
   scale_color_manual(values=mycols) +
   scale_linetype_manual(values=1:6) +
-  # geom_hline(yintercept=0.1, linetype=2, color="grey") +
-  ylab("Power (4D Mediation)") +
-  xlab("Min Effect Magnitude") +
-  ylim(c(0, 0.5)) + #xlim(c(0.02, 0.11)) +
-  xlab(expression(paste(tau[1] ,"= Proportion of (", alpha[j] != 0, ", ", beta[j], "=0, ", gamma[j], "=0,", delta[j], "=0)"))) +
+  #geom_hline(yintercept=0.1, linetype=2, color="grey") +
+  ylab("Power (3D Pleiotropy)") +
+  ylim(c(0, 1.0)) +
+  xlab(expression(paste(tau[1] ,"= Proportion of (", alpha[j] != 0, ", ", beta[j], "=0, ", gamma[j], "=0)"))) +
   theme_cowplot() +
   theme(axis.title = element_text(size=20), axis.text = element_text(size=16)) +
-  theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
+  theme(legend.title = element_text(size=20), legend.text = element_text(size=18))+
   theme(legend.key.size = unit(3,"line"))
-# put together figure 1
-Fig1_plot <- plot_grid(Fig3A_plot + theme(legend.position = "none"),
-                        Fig3B_plot + theme(legend.position = "none"),
-                        Fig3C_plot + theme(legend.position = "none"),
-                        Fig3D_plot + theme(legend.position = "none"),
-                       labels=c("A", "B", "C", "D"), nrow=2, label_size=22)
+
 # plot Figure 3F
 Fig3F_plot <- ggplot(data=Fig3B_data, aes(x=minEff1, y=Incongruous, group=Method)) +
   geom_line(aes(linetype = Method, color=Method),lwd=1.2) +
@@ -336,17 +257,18 @@ Fig3F_plot <- ggplot(data=Fig3B_data, aes(x=minEff1, y=Incongruous, group=Method
   # scale_linetype_manual(values=c(1,2,3,4,5,6)[-c(2,6)]) +
   scale_color_manual(values=mycols) +
   scale_linetype_manual(values=1:6) +
-  # geom_hline(yintercept=0.1, linetype=2, color="grey") +
-  ylab("Power (4D Mediation)") +
+  #geom_hline(yintercept=0.1, linetype=2, color="grey") +
+  ylab("Power (3D Pleiotropy)") +
   xlab("Min Effect Magnitude") +
-  ylim(c(0, 5000)) + #xlim(c(0.12, 0.22)) +
+  ylim(c(0, 12000)) + #xlim(c(0.26, 0.48)) +
   theme_cowplot() +
   theme(axis.title = element_text(size=20), axis.text = element_text(size=16)) +
   theme(legend.title = element_text(size=20), legend.text = element_text(size=18)) +
   theme(legend.key.size = unit(3,"line"))
 
 
-# # put together figure 3
+
+# put together figure 3
 Fig3_plot <- plot_grid(Fig3A_plot + theme(legend.position = "none"),
                        Fig3B_plot + theme(legend.position = "none"),
                        Fig3C_plot + theme(legend.position = "none"),
@@ -354,21 +276,11 @@ Fig3_plot <- plot_grid(Fig3A_plot + theme(legend.position = "none"),
                        Fig3E_plot + theme(legend.position = "none"),
                        Fig3F_plot + theme(legend.position = "none"),
                        labels=c("A", "B", "C", "D", "E", "F"), nrow=3, label_size=22)
-# 
-# 
+
+
 Fig3_legend <- get_legend(Fig3A_plot +  theme(legend.direction="horizontal",
                                               legend.justification="center",legend.box.just="bottom"))
-# 
-plot_grid(Fig7_plot, Fig7_legend, ncol=1, rel_heights=c(1, 0.1))
+
+plot_grid(Fig3_plot, Fig3_legend, ncol=1, rel_heights=c(1, 0.1))
 ggsave(paste0(outputDir, "/Fig3.pdf"), width=14, height=18)
-
-
-
-
-
-
-
-
-
-
 
