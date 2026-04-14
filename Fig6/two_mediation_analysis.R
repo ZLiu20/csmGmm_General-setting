@@ -24,6 +24,7 @@ library(DEIcompo)
 library(mediation.test)
 
 ## basic functions
+
 ################################################################################
 find_max_means_R1 <- function(muInfo) {
   
@@ -442,13 +443,14 @@ find_2d <- function(x, allTestStats) {
   length(which(allTestStats[1:x, 1] < allTestStats[x, 1] & allTestStats[1:x, 2] < allTestStats[x, 2]))
 }
 
-#'
+
 find_3d <- function(x, allTestStats) {
   length(which(allTestStats[1:x, 1] < allTestStats[x, 1] & allTestStats[1:x, 2] < allTestStats[x, 2] &
                  allTestStats[1:x, 3] < allTestStats[x, 3]))
 }
 
-#'
+
+
 find_4d <- function(x, allTestStats) {
   length(which(
     allTestStats[1:x, 1] < allTestStats[x, 1] & 
@@ -457,6 +459,7 @@ find_4d <- function(x, allTestStats) {
       allTestStats[1:x, 4] < allTestStats[x, 4]
   ))
 }
+
 
 
 ################################################################################
@@ -512,6 +515,8 @@ args <- commandArgs(trailingOnly=TRUE)
 aID <- as.numeric(args[1])
 Snum <- as.numeric(args[2])
 
+# aID <- 2
+
 # source the .R scripts from the SupportingCode/ folder 
 codePath <- c(here::here("SupportingCode"))
 toBeSourced <- list.files(codePath, "\\.R$")
@@ -523,7 +528,6 @@ outRoot <- paste0(outputDir, "/med_analysis_aID", aID)
 
 # additional data needed
 twasFname1 <- here::here("Data/mvp_scc__PM__Blood.csv")  #blood
-#twasFname <- here::here("Data/mvp_scc__PM__Lung.csv")
 twasFname <- here::here("Data/scc_lung_addchr1.csv")  #lung
 
 
@@ -552,7 +556,7 @@ twasRes1 <- read.csv(twasFname1) %>%
   set_colnames(c("Gene", "Z_twas1", "p_twas1")) %>%
   filter(!is.na(Z_twas1))
 
-# loop through 15 SNPs
+# loop through 3 SNPs
 for (snp_it in 1:nrow(tab2DF)) {
   tempFname <- paste0(outputDir, "/", tab2DF$RS[snp_it], "_", tab2DF$Gene[snp_it], "_", 
                       tab2DF$Chr[snp_it], "_", tab2DF$BP[snp_it], ".txt")
@@ -632,8 +636,11 @@ for (snp_it in 1:nrow(tab2DF)) {
     )
   }
   
-  write.table(deibLfdr, paste0(outRoot, "_deib.txt"),
-              append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+ incondeib <- length(check_incongruous(testData, deibLfdr))
+
+  ## save
+  write.table(deibLfdr, paste0(outRoot, "_deib.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(incondeib, paste0(outRoot, "_incondeib.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
   
   
   ## MTEST (always run)
@@ -654,54 +661,61 @@ for (snp_it in 1:nrow(tab2DF)) {
     )
   }
   
-  write.table(mtestLfdr, paste0(outRoot, "_mtest.txt"),
+  inconmtest <- length(check_incongruous(testData, mtestLfdr))
+  
+  ## save
+  write.table(mtestLfdr, paste0(outRoot, "_mtest.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(inconmtest, paste0(outRoot, "_inconmtest.txt"),
               append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
   
   
   # kernel
-  # oldResKernel <- emp_bayes_framework(summary_tab = testData, sameDirAlt = FALSE, kernel = TRUE, joint=FALSE, ind = TRUE,
-  #                                     dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
-
   oldResKernel <- emp_bayes_framework_R1(t_value = t, summary_tab = testData, sameDirAlt=TRUE, kernel = TRUE, joint=FALSE, ind = TRUE,
-                                         dfFit = 7, Hdist_epsilon=10^(-3), checkpoint=TRUE)
+                                         dfFit = 7, Hdist_epsilon=10^(-5), checkpoint=TRUE)
 
-
-  if (class(oldResKernel)[1] != "list") {
-    kernelLfdr <- rep(NA, nrow(testData))
-  } else {
+  if (is.list(oldResKernel)) {
     kernelLfdr <- oldResKernel$lfdrVec
+    inconKernel <- length(check_incongruous(testData, kernelLfdr))
+  } else {
+    kernelLfdr <- rep(NA_real_, nrow(testData)); inconKernel <- NA_integer_
   }
+  
   # save
   write.table(kernelLfdr, paste0(outRoot, "_kernel.txt"), append=F, quote=F, row.names=F, col.names=T)
-
+  write.table(inconKernel, paste0(outRoot, "_inconKernel.txt"), append=F, quote=F, row.names=F, col.names=T)
+  
   # 7 df
-  # oldRes7df <- emp_bayes_framework(summary_tab = testData[,1:2], sameDirAlt = FALSE, kernel = FALSE, joint=FALSE, ind = TRUE,
-  #                                  dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
   oldRes7df <- emp_bayes_framework_R1(t_value = t, summary_tab = testData, sameDirAlt=TRUE, kernel = FALSE, joint=FALSE, ind = TRUE,
-                                      dfFit = 7, Hdist_epsilon=10^(-3), checkpoint=TRUE)
+                                      dfFit = 7, Hdist_epsilon=10^(-5), checkpoint=TRUE)
 
-  if (class(oldRes7df)[1] != "list") {
-    df7Lfdr <- rep(NA, nrow(testData))
-  } else {
+  if (is.list(oldRes7df)) {
     df7Lfdr <- oldRes7df$lfdrVec
+    incon7df <- length(check_incongruous(testData, df7Lfdr))
+  } else {
+    df7Lfdr <- rep(NA_real_, nrow(testData)); incon7df <- NA_integer_
   }
+}
+
   # save
   write.table(df7Lfdr, paste0(outRoot, "_df7.txt"), append=F, quote=F, row.names=F, col.names=T)
-
+  write.table(incon7df, paste0(outRoot, "_incondf7.txt"), append=F, quote=F, row.names=F, col.names=T)
+  
   # 50 df
-  # oldRes50df <- emp_bayes_framework(summary_tab = testData, sameDirAlt = FALSE, kernel = FALSE, joint=FALSE, ind = TRUE,
-  #                                   dfFit = 50, Hdist_epsilon=10^(-2), checkpoint=TRUE)
   oldRes50df <- emp_bayes_framework_R1(t_value = t, summary_tab = testData, sameDirAlt=TRUE, kernel = FALSE, joint=FALSE, ind = TRUE,
-                                       dfFit = 50, Hdist_epsilon=10^(-3), checkpoint=TRUE)
+                                       dfFit = 50, Hdist_epsilon=10^(-5), checkpoint=TRUE)
+  
 
-  if (class(oldRes50df)[1] != "list") {
-    df50Lfdr <- rep(NA, nrow(testData))
-  } else {
+  if (is.list(oldRes50df)) {
     df50Lfdr <- oldRes50df$lfdrVec
+    incon50df <- length(check_incongruous(testDat, df50Lfdr))
+  } else {
+    df50Lfdr <- rep(NA_real_, nrow(testData)); incon50df <- NA_integer_
   }
+  
   # save
   write.table(df50Lfdr, paste0(outRoot, "_df50.txt"), append=F, quote=F, row.names=F, col.names=T)
-
+  write.table(incon50df, paste0(outRoot, "_incondf50.txt"), append=F, quote=F, row.names=F, col.names=T)
+  
   
   
   # new method
@@ -724,18 +738,21 @@ for (snp_it in 1:nrow(tab2DF)) {
   # }
   # initMuList[[2^nDims]] <- matrix(data=c(8, 8, 8, 8), nrow=nDims)
   
-  
-  #newRes <- symm_fit_ind_EM(testStats = testDat[, 1:2], sameDirAlt = FALSE, initMuList = initMuList, initPiList = initPiList, eps=newEps)
-  
-  #corRes <- symm_fit_cor_EM(t_value = t, testStats = testData, corMat = estCorAll, sameDirAlt = TRUE, initMuList = initMuListCor, initPiList = initPiListCor, eps=newEps)
   newRes <- symm_fit_ind_EM_R1(t_value = t, testStats = testData, initMuList = initMuList,
-                               initPiList = initPiList, sameDirAlt=TRUE, eps=10^(-4))
+                               initPiList = initPiList, sameDirAlt=TRUE, eps=10^(-5))
+  
+  inconnew <- if (is.list(newRes)) {
+    length(check_incongruous(zMatrix = testData, lfdrVec = newRes$lfdrResults))
+  } else NA_integer_
   
   # save
   newOut <- Combin_data %>% mutate(newLfdr = newRes$lfdrResults)
   write.table(newOut, paste0(outRoot, "_newlfdr.txt"), append=F, quote=F, row.names=F, col.names=T)
+  write.table(inconnew, paste0(outRoot, "_inconnew.txt"), append=F, quote=F, row.names=F, col.names=T)
+  
   write.table(do.call(cbind, newRes$muInfo), paste0(outRoot, "_muInfo.txt"), append=F, quote=F, row.names=F, col.names=T)
   write.table(do.call(cbind, newRes$piInfo), paste0(outRoot, "_piInfo.txt"), append=F, quote=F, row.names=F, col.names=T)
-}
+
+
 
 
