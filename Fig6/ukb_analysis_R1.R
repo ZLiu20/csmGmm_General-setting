@@ -13,7 +13,11 @@ library(devtools)
 library(ks)
 library(csmGmm)
 library(here)
+library(usethis)
 library(locfdr)
+library(qch)
+#library(adaFilter)
+library(adaFilter, lib.loc = "/rsrch8/home/biostatistics/zliu20/R/x86_64-pc-linux-gnu-library")
 
 
 # define the  function
@@ -51,14 +55,14 @@ define_H_space_R1 <- function(K,t,sameDirAlt=FALSE) {
   H_annot <- rep(0, nrow(H_space))
   ## Revised on 2026/01/20
   if (sameDirAlt) {
-  # H_annot[which(apply(abs(H_space), 1, sum) == K)] <- 1
-  H_annot[which(
-    apply(abs(H_space), 1, sum) > t &
-      apply(abs(H_space), 1, sum) <= K & 
-      apply(abs(H_space), 1, sum) == abs(apply(sign(H_space), 1, sum)) )] <- 1  
+    # H_annot[which(apply(abs(H_space), 1, sum) == K)] <- 1
+    H_annot[which(
+      apply(abs(H_space), 1, sum) > t &
+        apply(abs(H_space), 1, sum) <= K & 
+        apply(abs(H_space), 1, sum) == abs(apply(sign(H_space), 1, sum)) )] <- 1  
   } else { 
-      H_annot[which(
-        apply(abs(H_space), 1, sum) >t & apply(abs(H_space), 1, sum) <= K )] <- 1
+    H_annot[which(
+      apply(abs(H_space), 1, sum) >t & apply(abs(H_space), 1, sum) <= K )] <- 1
   }
   
   return( list(H_space=H_space, H_annot=H_annot) )
@@ -128,7 +132,7 @@ emp_bayes_framework_R1 <- function(t_value, summary_tab, sameDirAlt=FALSE, nullt
 
 
 ################################################################################
-symm_fit_ind_EM_R1 <- function(t_value, testStats, initMuList, initPiList, sameDirAlt=TRUE, eps = 10^(-5), checkpoint=TRUE) {
+symm_fit_ind_EM_R1 <- function(t_value, testStats, initMuList, initPiList, sameDirAlt=FALSE, eps = 10^(-5), checkpoint=TRUE) {
   
   # number of composite null hypotheses
   J <- nrow(testStats)
@@ -315,60 +319,169 @@ symm_fit_ind_EM_R1 <- function(t_value, testStats, initMuList, initPiList, sameD
 
 
 ################################################################################
-check_incongruous_R1 <- function(zMatrix, lfdrVec, t_value) {
+#' Check for incongruous results in multiple dimensions
+#'
+#' @param zMatrix Matrix of test statistics
+#' @param lfdrVec Vector of local false discovery rates
+#'
+#' @return Vector of indices of incongruous results
+#'
+#' @export
+check_incongruous <- function(zMatrix, lfdrVec) {
+  # Remove lfdr = 1
+  lessThanOne <- which(lfdrVec < 0.99)
+  if (length(lessThanOne) <= 1) {return(c())}
+  
+  zMatrix <- zMatrix[lessThanOne, ]
+  lfdrVec <- lfdrVec[lessThanOne]
+  
+  # Do it in K^2 quadrants
   K <- ncol(zMatrix)
+  quadrants <- expand.grid(rep(list(c(-1, 1)), K))
   
-  # Step 1: Define H space
-  H_output <- define_H_space_R1(K = K, t = t_value)
-  H_space <- H_output$H_space
-  H_annot <- H_output$H_annot
-  
-  # Step 2: Assign configuration to each SNP
-  sign_mat <- sign(zMatrix)
-  config_idx <- apply(sign_mat, 1, function(s) {
-    match_idx <- which(apply(H_space, 1, function(h) all(h == s)))
-    if (length(match_idx) == 0) return(NA)  # Z=0 
-    return(match_idx[1])
-  })
-  
-  # Remove SNPs with undefined config (e.g., all Z=0)
-  valid <- !is.na(config_idx)
-  if (!any(valid)) return(c())
-  
-  zMatrix <- zMatrix[valid, , drop = FALSE]
-  lfdrVec <- lfdrVec[valid]
-  config_idx <- config_idx[valid]
-  is_alt <- H_annot[config_idx]
-  
-  # Step 3: Get alternative and null sets
-  alt_idx <- which(is_alt == 1 & lfdrVec < 0.99)
-  null_idx <- which(is_alt == 0 & lfdrVec < 0.99)
-  
-  if (length(alt_idx) == 0 || length(null_idx) == 0) return(c())
-  
-  z_alt <- abs(zMatrix[alt_idx, , drop = FALSE])
-  lfdr_alt <- lfdrVec[alt_idx]
-  z_null <- abs(zMatrix[null_idx, , drop = FALSE])
-  lfdr_null <- lfdrVec[null_idx]
-  
-  # Step 4: Check inconsistency
-  bad_alt <- c()
-  for (i in seq_len(nrow(z_alt))) {
-    # Find null points with smaller magnitude in ALL dimensions
-    dominated <- apply(z_null, 1, function(zn) all(zn < z_alt[i, ]))
-    if (any(dominated)) {
-      # If any dominated null point has lfdr <= current alt point ? incongruous
-      if (any(lfdr_null[dominated] <= lfdr_alt[i])) {
-        bad_alt <- c(bad_alt, which(valid)[alt_idx[i]])  # map back to original index
+  badIdx <- c()
+  for (quad_it in 1:nrow(quadrants)) {
+    # Separate into quadrants
+    idxVec <- 1:nrow(zMatrix)
+    tempStats <- zMatrix
+    tempLfdr <- lfdrVec
+    
+    for (k_it in 1:K) {
+      if (class(tempStats)[1] == "numeric") {break}
+      
+      if (quadrants[quad_it, k_it] == -1) {
+        toKeep <- which(tempStats[, k_it] < 0)
+        idxVec <- idxVec[toKeep]
+        tempLfdr <- tempLfdr[toKeep]
+      } else {
+        toKeep <- which(tempStats[, k_it] > 0)
+        idxVec <- idxVec[toKeep]
+        tempLfdr <- tempLfdr[toKeep]
       }
+      
+      tempStats <- tempStats[toKeep, ]
+    } # end finding quadrant
+    
+    if (length(idxVec) <= 1) {next}
+    
+    # Take absolute value
+    tempStats <- abs(tempStats)
+    
+    # Prepare data
+    tempDat <- tempStats %>% 
+      as.data.frame(.data) %>%
+      dplyr::mutate(lfdr = tempLfdr) %>%
+      dplyr::mutate(idx = idxVec)
+    
+    # Check for incongruous results based on dimensions
+    if (K == 2) {
+      colnames(tempDat)[1:2] <- c("Z1", "Z2")
+      tempDat <- tempDat %>%
+        dplyr::arrange(tempLfdr, dplyr::desc(.data$Z1), dplyr::desc(.data$Z2))
+      incongruousVec <- sapply(1:nrow(tempDat), 
+                               FUN = find_2d, 
+                               allTestStats = as.matrix(tempDat %>% dplyr::select(.data$Z1, .data$Z2)))
+    } else if (K == 3) {
+      colnames(tempDat)[1:3] <- c("Z1", "Z2", "Z3")
+      tempDat <- tempDat %>%
+        dplyr::arrange(tempLfdr, dplyr::desc(.data$Z1), dplyr::desc(.data$Z2), dplyr::desc(.data$Z3))
+      incongruousVec <- sapply(1:nrow(tempDat), 
+                               FUN = find_3d, 
+                               allTestStats = as.matrix(tempDat %>% dplyr::select(.data$Z1, .data$Z2, .data$Z3)))
+    } else if (K == 4) {
+      colnames(tempDat)[1:4] <- c("Z1", "Z2", "Z3", "Z4")
+      tempDat <- tempDat %>%
+        dplyr::arrange(tempLfdr, 
+                       dplyr::desc(.data$Z1), 
+                       dplyr::desc(.data$Z2), 
+                       dplyr::desc(.data$Z3), 
+                       dplyr::desc(.data$Z4))
+      incongruousVec <- sapply(1:nrow(tempDat), 
+                               FUN = find_4d, 
+                               allTestStats = as.matrix(tempDat %>% dplyr::select(.data$Z1, .data$Z2, .data$Z3, .data$Z4)))
+    } else {
+      stop("only support for 2-4 dimensions right now")
     }
+    
+    # Get the bad indices
+    badIdx <- c(badIdx, tempDat$idx[which(incongruousVec > 0)])
   }
   
-  return(bad_alt)
+  return(badIdx)
+}
+
+
+#'
+find_2d <- function(x, allTestStats) {
+  length(which(allTestStats[1:x, 1] < allTestStats[x, 1] & allTestStats[1:x, 2] < allTestStats[x, 2]))
+}
+
+#'
+find_3d <- function(x, allTestStats) {
+  length(which(allTestStats[1:x, 1] < allTestStats[x, 1] & allTestStats[1:x, 2] < allTestStats[x, 2] &
+                 allTestStats[1:x, 3] < allTestStats[x, 3]))
+}
+
+#'
+find_4d <- function(x, allTestStats) {
+  length(which(
+    allTestStats[1:x, 1] < allTestStats[x, 1] & 
+      allTestStats[1:x, 2] < allTestStats[x, 2] & 
+      allTestStats[1:x, 3] < allTestStats[x, 3] &
+      allTestStats[1:x, 4] < allTestStats[x, 4]
+  ))
 }
 
 
 ################################################################################
+run_qch_multi_alpha <- function(pmat, zmat, Hconfig_qch, H1config_qch, qch_test_name,
+                                alpha_vec = c(0.01, 0.10)) {
+  pmat <- as.matrix(pmat)
+  zmat <- as.matrix(zmat)
+  
+  pmat[!is.finite(pmat)] <- 1
+  pmat <- pmin(pmax(pmat, 0), 1)
+  
+  qch_fit <- qch::qch.fit(
+    pValMat = as.data.frame(pmat),
+    Hconfig = Hconfig_qch,
+    copula = "gaussian",
+    plotting = FALSE
+  )
+  
+  out <- list()
+  for (a in alpha_vec) {
+    tag <- gsub("\\.", "", sprintf("%.2f", a))  # 0.01 -> "001", 0.10 -> "010"
+    
+    qch_res <- qch::qch.test(
+      res.qch.fit = qch_fit,
+      Hconfig = Hconfig_qch,
+      Hconfig.H1 = H1config_qch,
+      Alpha = a
+    )
+    
+    lf <- qch_res$lFDR[[qch_test_name]]
+    if (is.null(lf) || length(lf) != nrow(zmat)) {
+      lf <- rep(NA_real_, nrow(zmat))
+    } else {
+      lf <- as.numeric(lf)
+      lf[!is.finite(lf)] <- NA_real_
+      lf <- pmin(pmax(lf, 0), 1)
+    }
+    
+    incon <- if (all(is.na(lf))) NA_integer_ else {
+      length(check_incongruous(zMatrix = zmat, lfdrVec = lf))
+    }
+    
+    out[[paste0("lfdr_", tag)]] <- lf
+    # out[[paste0("incon_", tag)]] <- incon
+  }
+  
+  out
+}
+
+################################################################################
+
 
 
 # record input - controls seed, parameters, etc.
@@ -382,8 +495,8 @@ toBeSourced <- list.files(codePath, "\\.R$")
 purrr::map(paste0(codePath, "/", toBeSourced), source)
 
 # set output directory 
-outputDir <- here::here("Fig6", "output")
-fnameRoot <- paste0(outputDir, "/Fig6_data_aID", aID)
+outputDir <- here::here("Fig4", "output")
+fnameRoot <- paste0(outputDir, "/Fig4_data_aID", aID)
 
 # where is the data
 summaryStatDir <- here::here("Data")
@@ -396,9 +509,15 @@ newEps <- 10^(-3)
 replication <- FALSE
 pleiotropy <- FALSE
 
-doKernel <- TRUE
-do50df <- TRUE
-do7df <- TRUE
+doKernel <- FALSE
+do50df <- FALSE
+do7df <- FALSE
+New <- FALSE
+# doKernel <- TRUE
+# do50df <- TRUE
+# do7df <- TRUE
+doQCH <- TRUE
+doAdaFilter <- TRUE
 
 t <- 1
 if (aID == 1) {
@@ -442,143 +561,211 @@ for (col_it in ((ncol(testDat)/2)+1):ncol(testDat)) {
   }
 }
 
+
+nZ <- ncol(testDat) / 2
+zMat <- as.matrix(testDat[, 1:nZ, drop = FALSE])
+pMat <- as.matrix(testDat[, (nZ + 1):ncol(testDat), drop = FALSE])
+
 if (pleiotropy) {
-
-  # run kernel
-if (doKernel) {
-  oldResKernel <- emp_bayes_framework_R1(t_value = t, summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = TRUE, joint=FALSE, ind = TRUE,
-                                         dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
-  # oldResKernel <- emp_bayes_framework(summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = TRUE, joint=FALSE, ind = TRUE,
-  #                                   dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
-  if (class(oldResKernel)[1] != "list") {
-    kernelLfdr <- rep(NA, nrow(testDat))
-  } else {
-    kernelLfdr <- oldResKernel$lfdrVec
-  }
-  # save
-  write.table(kernelLfdr, paste0(fnameRoot, "_kernel.txt"), append=F, quote=F, row.names=F, col.names=T)
-}
-
-# run 7 df
-if (do7df) {
-  # oldRes7df <- emp_bayes_framework(summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = FALSE, joint=FALSE, ind = TRUE,
-  #                                  dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
-  oldRes7df <- emp_bayes_framework_R1(t_value = t, summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = FALSE, joint=FALSE, ind = TRUE,
-                                      dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
-  if (class(oldRes7df)[1] != "list") {
-    df7Lfdr <- rep(NA, nrow(testDat))
-  } else {
-    df7Lfdr <- oldRes7df$lfdrVec
-  }
-  # save
-  write.table(df7Lfdr, paste0(fnameRoot, "_df7.txt"), append=F, quote=F, row.names=F, col.names=T)
-}
-
-# run 50 df
-if (do50df) {
-  # oldRes50df <- emp_bayes_framework(summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = FALSE, joint=FALSE, ind = TRUE,
-  #                                 dfFit = 50, Hdist_epsilon=10^(-2), checkpoint=TRUE)
-  oldRes50df <- emp_bayes_framework_R1(t_value = t, summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = FALSE, joint=FALSE, ind = TRUE,
-                                       dfFit = 50, Hdist_epsilon=10^(-2), checkpoint=TRUE)
-  if (class(oldRes50df)[1] != "list") {
-    df50Lfdr <- rep(NA, nrow(testDat))
-  } else {
-    df50Lfdr <- oldRes50df$lfdrVec
-  }
-  # save
-  write.table(df50Lfdr, paste0(fnameRoot, "_df50.txt"), append=F, quote=F, row.names=F, col.names=T)
-}
-
-# 3D cases pleiotropy
-  initPiList <- list(c(0.82))
-  for (i in 2:7) {initPiList[[i]] <- c(0.08 / 12, 0.08 / 12)}
-  initPiList[[8]] <- c(0.1)
-  tempH <- expand.grid(c(0, 1), c(0, 1), c(0, 1)) %>%
-    mutate(s = Var1 + Var2 + Var3) %>%
-    arrange(s) %>%
-    select(-s) %>%
-    as.matrix(.)
-  initMuList <- list(matrix(data=0, nrow=3, ncol=1))
-  for (i in 2:7) {
-    initMuList[[i]] <- cbind(rep(2, 3), rep(5, 3))
-  }
-  initMuList[[8]] <- matrix(data=c(8, 8, 8), nrow=3)
   
-  newRes <- symm_fit_ind_EM_R1(t_value = t, testStats = testDat[, 1:3], initMuList = initMuList, 
-                               initPiList = initPiList, eps = newEps)
+  # kernel
+  if (doKernel) {
+    oldResKernel <- emp_bayes_framework_R1(
+      t_value = t, summary_tab = zMat, sameDirAlt = replication,
+      kernel = TRUE, joint = FALSE, ind = TRUE, dfFit = 7,
+      Hdist_epsilon = 1e-2, checkpoint = TRUE
+    )
+    if (is.list(oldResKernel)) {
+      kernelLfdr <- oldResKernel$lfdrVec
+      inconKernel <- length(check_incongruous(zMatrix = zMat, lfdrVec = kernelLfdr))
+    } else {
+      kernelLfdr <- rep(NA_real_, nrow(zMat))
+      inconKernel <- NA_integer_
+    }
+  }
+  
+  # 7df
+  if (do7df) {
+    oldRes7df <- emp_bayes_framework_R1(
+      t_value = t, summary_tab = zMat, sameDirAlt = replication,
+      kernel = FALSE, joint = FALSE, ind = TRUE, dfFit = 7,
+      Hdist_epsilon = 1e-2, checkpoint = TRUE
+    )
+    if (is.list(oldRes7df)) {
+      df7Lfdr <- oldRes7df$lfdrVec
+      incon7df <- length(check_incongruous(zMatrix = zMat, lfdrVec = df7Lfdr))
+    } else {
+      df7Lfdr <- rep(NA_real_, nrow(zMat))
+      incon7df <- NA_integer_
+    }
+  }
+  
+  # 50df
+  if (do50df) {
+    oldRes50df <- emp_bayes_framework_R1(
+      t_value = t, summary_tab = zMat, sameDirAlt = replication,
+      kernel = FALSE, joint = FALSE, ind = TRUE, dfFit = 50,
+      Hdist_epsilon = 1e-2, checkpoint = TRUE
+    )
+    if (is.list(oldRes50df)) {
+      df50Lfdr <- oldRes50df$lfdrVec
+      incon50df <- length(check_incongruous(zMatrix = zMat, lfdrVec = df50Lfdr))
+    } else {
+      df50Lfdr <- rep(NA_real_, nrow(zMat))
+      incon50df <- NA_integer_
+    }
+  }
+  
+  # New
+  if (New) {
+  initPiList <- list(c(0.82))
+  for (i in 2:7) initPiList[[i]] <- c(0.08 / 12, 0.08 / 12)
+  initPiList[[8]] <- c(0.1)
+  
+  initMuList <- list(matrix(data = 0, nrow = 3, ncol = 1))
+  for (i in 2:7) initMuList[[i]] <- cbind(rep(2, 3), rep(5, 3))
+  initMuList[[8]] <- matrix(data = c(8, 8, 8), nrow = 3)
+  
+  newRes <- symm_fit_ind_EM_R1(
+    t_value = t, testStats = zMat, initMuList = initMuList,
+    initPiList = initPiList, sameDirAlt = replication, eps = newEps
+  )
+  inconnew <- if (is.list(newRes)) {
+    length(check_incongruous(zMatrix = zMat, lfdrVec = newRes$lfdrResults))
+  } else NA_integer_
+  
+  cat("[New method] DONE  ", format(Sys.time(), "%H:%M:%S"), "\n", sep = "")
+  
+  }
+  
+  
+  # qch (two q values)
+  
+  if (doQCH) {
+    Hconfig_qch <- qch::GetHconfig(ncol(zMat))
+    H1config_qch <- qch::GetH1AtLeast(Hconfig_qch, AtLeast = 2)  # change if needed
+    qch_test_name <- "AtLeast_2"
+    
+    qch_out <- tryCatch(
+      run_qch_multi_alpha(
+        pmat = pMat,
+        zmat = zMat,
+        Hconfig_qch = Hconfig_qch,
+        H1config_qch = H1config_qch,
+        qch_test_name = qch_test_name,
+        alpha_vec = c(0.01, 0.10)
+      ),
+      error = function(e) list(
+        lfdr_001 = rep(NA_real_, nrow(zMat)),
+        incon_001 = NA_integer_,
+        lfdr_010 = rep(NA_real_, nrow(zMat)),
+        incon_010 = NA_integer_
+      )
+    )
+    
+    # save
+    write.table(qch_out$lfdr_001, paste0(fnameRoot, "_qch01.txt"),
+                append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+    write.table(qch_out$incon_001, paste0(fnameRoot, "_inconqch01.txt"),
+                append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+
+    write.table(qch_out$lfdr_010, paste0(fnameRoot, "_qch10.txt"),
+                append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+    write.table(qch_out$incon_010, paste0(fnameRoot, "_inconqch10.txt"),
+                append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  }
+    
+  
+  # adaFilter
+  if (doAdaFilter) {
+    pmat_a <- pMat
+    pmat_a[!is.finite(pmat_a)] <- 1
+    pmat_a <- pmin(pmax(pmat_a, 0), 1)
+    
+    adaLfdr <- tryCatch({
+      ao <- adaFilter::adaFilter(pmat_a, r = 2)
+      if (!is.null(ao$adjusted.p) && length(ao$adjusted.p) == nrow(zMat)) as.numeric(ao$adjusted.p) else rep(NA_real_, nrow(zMat))
+    }, error = function(e) rep(NA_real_, nrow(zMat)))
+    
+    adaLfdr[!is.finite(adaLfdr)] <- NA_real_
+    adaLfdr <- pmin(pmax(adaLfdr, 0), 1)
+    inconAda <- if (all(is.na(adaLfdr))) NA_integer_ else length(check_incongruous(zMat, adaLfdr))
+  }
+  
+  
+  if (doAdaFilter) {
+    write.table(adaLfdr, paste0(fnameRoot, "_adaFilter.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+    write.table(inconAda, paste0(fnameRoot, "_inconada.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  }
+  
+  write.table(kernelLfdr, paste0(fnameRoot, "_kernel.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(inconKernel, paste0(fnameRoot, "_inconKernel.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(df7Lfdr, paste0(fnameRoot, "_df7.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(incon7df, paste0(fnameRoot, "_incon7df.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(df50Lfdr, paste0(fnameRoot, "_df50.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(incon50df, paste0(fnameRoot, "_incon50df.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(newRes$lfdrResults, paste0(fnameRoot, "_newlfdr.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(inconnew, paste0(fnameRoot, "_inconnew.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(do.call(cbind, newRes$muInfo), paste0(fnameRoot, "_muInfo.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(do.call(cbind, newRes$piInfo), paste0(fnameRoot, "_piInfo.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
 }
 
-
-###
 if (replication) {
-
-  # run kernel
-if (doKernel) {
-  oldResKernel <- emp_bayes_framework_R1(t_value = t, summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = TRUE, joint=FALSE, ind = TRUE,
-                                         dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
-  # oldResKernel <- emp_bayes_framework(summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = TRUE, joint=FALSE, ind = TRUE,
-  #                                   dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
-  if (class(oldResKernel)[1] != "list") {
-    kernelLfdr <- rep(NA, nrow(testDat))
-  } else {
-    kernelLfdr <- oldResKernel$lfdrVec
+  
+  if (doKernel) {
+    oldResKernel <- emp_bayes_framework_R1(t_value = t, summary_tab = zMat, sameDirAlt = replication, kernel = TRUE, joint = FALSE, ind = TRUE, dfFit = 7, Hdist_epsilon = 1e-2, checkpoint = TRUE)
+    if (is.list(oldResKernel)) {
+      kernelLfdr <- oldResKernel$lfdrVec
+      inconKernel <- length(check_incongruous(zMat, kernelLfdr))
+    } else {
+      kernelLfdr <- rep(NA_real_, nrow(zMat)); inconKernel <- NA_integer_
+    }
   }
-  # save
-  write.table(kernelLfdr, paste0(fnameRoot, "_kernel.txt"), append=F, quote=F, row.names=F, col.names=T)
-}
-
-# run 7 df
-if (do7df) {
-  # oldRes7df <- emp_bayes_framework(summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = FALSE, joint=FALSE, ind = TRUE,
-  #                                  dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
-  oldRes7df <- emp_bayes_framework_R1(t_value = t, summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = FALSE, joint=FALSE, ind = TRUE,
-                                      dfFit = 7, Hdist_epsilon=10^(-2), checkpoint=TRUE)
-  if (class(oldRes7df)[1] != "list") {
-    df7Lfdr <- rep(NA, nrow(testDat))
-  } else {
-    df7Lfdr <- oldRes7df$lfdrVec
+  
+  if (do7df) {
+    oldRes7df <- emp_bayes_framework_R1(t_value = t, summary_tab = zMat, sameDirAlt = replication, kernel = FALSE, joint = FALSE, ind = TRUE, dfFit = 7, Hdist_epsilon = 1e-2, checkpoint = TRUE)
+    if (is.list(oldRes7df)) {
+      df7Lfdr <- oldRes7df$lfdrVec
+      incon7df <- length(check_incongruous(zMat, df7Lfdr))
+    } else {
+      df7Lfdr <- rep(NA_real_, nrow(zMat)); incon7df <- NA_integer_
+    }
   }
-  # save
-  write.table(df7Lfdr, paste0(fnameRoot, "_df7.txt"), append=F, quote=F, row.names=F, col.names=T)
-}
-
-# run 50 df
-if (do50df) {
-  # oldRes50df <- emp_bayes_framework(summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = FALSE, joint=FALSE, ind = TRUE,
-  #                                 dfFit = 50, Hdist_epsilon=10^(-2), checkpoint=TRUE)
-  oldRes50df <- emp_bayes_framework_R1(t_value = t, summary_tab = testDat[, 1:(ncol(testDat)/2)], sameDirAlt = replication, kernel = FALSE, joint=FALSE, ind = TRUE,
-                                       dfFit = 50, Hdist_epsilon=10^(-2), checkpoint=TRUE)
-  if (class(oldRes50df)[1] != "list") {
-    df50Lfdr <- rep(NA, nrow(testDat))
-  } else {
-    df50Lfdr <- oldRes50df$lfdrVec
+  
+  if (do50df) {
+    oldRes50df <- emp_bayes_framework_R1(t_value = t, summary_tab = zMat, sameDirAlt = replication, kernel = FALSE, joint = FALSE, ind = TRUE, dfFit = 50, Hdist_epsilon = 1e-2, checkpoint = TRUE)
+    if (is.list(oldRes50df)) {
+      df50Lfdr <- oldRes50df$lfdrVec
+      incon50df <- length(check_incongruous(zMat, df50Lfdr))
+    } else {
+      df50Lfdr <- rep(NA_real_, nrow(zMat)); incon50df <- NA_integer_
+    }
   }
-  # save
-  write.table(df50Lfdr, paste0(fnameRoot, "_df50.txt"), append=F, quote=F, row.names=F, col.names=T)
-}
-
-  # 3D cases Replication
+  
   initPiList <- list(c(0.82))
-  for (i in 2:7) {initPiList[[i]] <- c(0.08 / 12, 0.08 / 12)}
+  for (i in 2:7) initPiList[[i]] <- c(0.08 / 12, 0.08 / 12)
   initPiList[[8]] <- c(0.1)
-  # the csmGmm package will add the appropriate 0s to initMuList
-  initMuList <- list(matrix(data=0, nrow=3, ncol=1))
-  for (i in 2:7) {
-    initMuList[[i]] <- cbind(rep(2, 3), rep(5, 3))
-  }
-  initMuList[[8]] <- matrix(data=c(8, 8, 8), nrow=3)
+  initMuList <- list(matrix(data = 0, nrow = 3, ncol = 1))
+  for (i in 2:7) initMuList[[i]] <- cbind(rep(2, 3), rep(5, 3))
+  initMuList[[8]] <- matrix(data = c(8, 8, 8), nrow = 3)
   
-  newRes <- symm_fit_ind_EM_R1(t_value = t, testStats = testDat[, 1:3], initMuList = initMuList, 
-                               initPiList = initPiList, sameDirAlt=replication, eps = newEps)
+  newRes <- symm_fit_ind_EM_R1(
+    t_value = t, testStats = zMat, initMuList = initMuList,
+    initPiList = initPiList, sameDirAlt = replication, eps = newEps
+  )
+  inconnew <- if (is.list(newRes)) length(check_incongruous(zMat, newRes$lfdrResults)) else NA_integer_
   
+  write.table(kernelLfdr, paste0(fnameRoot, "_kernel.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(inconKernel, paste0(fnameRoot, "_inconKernel.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(df7Lfdr, paste0(fnameRoot, "_df7.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(incon7df, paste0(fnameRoot, "_incon7df.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(df50Lfdr, paste0(fnameRoot, "_df50.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(incon50df, paste0(fnameRoot, "_incon50df.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(newRes$lfdrResults, paste0(fnameRoot, "_newlfdr.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(inconnew, paste0(fnameRoot, "_inconnew.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(do.call(cbind, newRes$muInfo), paste0(fnameRoot, "_muInfo.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
+  write.table(do.call(cbind, newRes$piInfo), paste0(fnameRoot, "_piInfo.txt"), append = FALSE, quote = FALSE, row.names = FALSE, col.names = TRUE)
 }
-
-# save
-write.table(newRes$lfdrResults, paste0(fnameRoot, "_newlfdr.txt"), append=F, quote=F, row.names=F, col.names=T)
-write.table(do.call(cbind, newRes$muInfo), paste0(fnameRoot, "_muInfo.txt"), append=F, quote=F, row.names=F, col.names=T)
-write.table(do.call(cbind, newRes$piInfo), paste0(fnameRoot, "_piInfo.txt"), append=F, quote=F, row.names=F, col.names=T)
-
-
 
 
 
