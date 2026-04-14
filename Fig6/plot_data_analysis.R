@@ -1,11 +1,11 @@
-# Make Figure 7 and Table 1 
+# Make Figure 6 and Tables 1-2 
 
 # Using the here package to manage file paths. If an error is thrown, please
 # set the working directory to the folder that holds this Rscript, e.g.
 # setwd("/path/to/csmGmm_reproduce/Fig4/plot_data_analysis.R") or set the path after the -cwd flag
 # in the .lsf file, and then run again.
-setwd("~/Downloads/csmGmm_sim_R3/Fig7")
-here::i_am("Fig7/plot_data_analysis.R")
+setwd("~/Downloads/csmGmm_sim_R3/Fig6")
+here::i_am("Fig6/plot_data_analysis.R")
 
 library(dplyr)
 library(magrittr)
@@ -23,7 +23,7 @@ toBeSourced <- list.files(codePath, "\\.R$")
 purrr::map(paste0(codePath, "/", toBeSourced), source)
 
 # set output directory 
-outputDir <- here::here("Fig7", "output")
+outputDir <- here::here("Fig6", "output")
 dataDir <- here::here("Data")
 
 # for colors
@@ -139,30 +139,108 @@ manPlotRep <- plotManhattan(plotRes = manDataRep, chrCounts,
                             ylimits=c(0, 6.5), legName="Pleiotropy & Replication")
 manPlotTwo
 
-ggsave(paste0(outputDir, "/Fig_Pleiotropy.pdf"), width=18, height=8)
+ggsave(paste0(outputDir, "/Fig_Pleiotropy.pdf"), width=14, height=18)
 
 
 #----------------------------------------------------------------------------#
 # Table 2
 
-# read summary of pleiotropy analysis
-adjAnal <- fread(here::here(outputDir, "processed_ukb_data_S1.txt"))
+adjAnal  <- fread(here::here(outputDir, "processed_ukb_data_S1.txt"))
 origAnal <- fread(here::here(outputDir, "processed_ukb_data_S2.txt"))
 
-tab2 <- origAnal %>% filter(aID == 1) %>% select(Method, numReject) %>%
-  mutate(a1 = adjAnal %>% filter(aID == 1) %>% select(numReject) %>% unlist(.)) %>%
-  mutate(a1new = origAnal %>% filter(aID == 2) %>% select(numReject) %>% unlist(.)) %>%
-  mutate(a2new = adjAnal %>% filter(aID == 2) %>% select(numReject) %>% unlist(.)) 
+adaFilter <- fread(here::here(outputDir, "Fig4_data_aID1_adaFilter.txt"))
+adjqch    <- fread(here::here(outputDir, "Fig4_data_aID1_qch01.txt"))
+origqch   <- fread(here::here(outputDir, "Fig4_data_aID1_qch10.txt"))
 
-tab2final <- tab2 %>%
-  set_colnames(c("Method", "Orig", "Adj", "Orig ", "Adj ")) %>%
-  mutate(Method = c("csmGmm", "Kernel", "locfdr50", "locfdr7"))
+# -----------------------------
+# Harmonize method names
+# -----------------------------
+map_method <- function(x) {
+  fcase(
+    x == "New",  "csmGmm",
+    x == "df50", "locfdr50",
+    x == "df7",  "locfdr7",
+    default = x
+  )
+}
+origAnal[, Method := map_method(Method)]
+adjAnal[,  Method := map_method(Method)]
+
+# -----------------------------
+# Compute extra method counts (aID=1 only)
+# -----------------------------
+num_rejadaFilter <- sum(unlist(adaFilter) < 0.1,  na.rm = TRUE)
+num_rejQCH_adj   <- sum(unlist(adjqch)    < 0.01, na.rm = TRUE)
+num_rejQCH_orig  <- sum(unlist(origqch)   < 0.1,  na.rm = TRUE)
+
+orig_extra <- data.table(
+  Method = c("qch_copula", "adaFilter"),
+  numReject = c(num_rejQCH_orig, num_rejadaFilter),
+  aID = 1L
+)
+adj_extra <- data.table(
+  Method = c("qch_copula", "adaFilter"),
+  numReject = c(num_rejQCH_adj, num_rejadaFilter),
+  aID = 1L
+)
+
+# -----------------------------
+# Combine tables
+# -----------------------------
+orig_all <- rbindlist(list(origAnal, orig_extra), use.names = TRUE, fill = TRUE)
+adj_all  <- rbindlist(list(adjAnal,  adj_extra),  use.names = TRUE, fill = TRUE)
+
+orig_all[, Source := "Orig"]
+adj_all[,  Source := "Adj"]
+
+long <- rbindlist(list(orig_all, adj_all), use.names = TRUE, fill = TRUE)[
+  !is.na(Method) & !is.na(aID),
+  .(Method = as.character(Method), aID = as.integer(aID), Source, numReject = as.integer(numReject))
+]
+
+# aID meaning
+long[, Analysis := fcase(
+  aID == 1L, "Pleiotropy",
+  aID == 2L, "Replication",
+  default = paste0("aID_", aID)
+)]
+
+# -----------------------------
+# Build Table 2
+# -----------------------------
+tab2final <- dcast(
+  long[aID %in% c(1L, 2L)],
+  Method ~ Source + Analysis,
+  value.var = "numReject",
+  fun.aggregate = function(x) x[1]
+)
+
+# ensure expected columns exist
+need_cols <- c(
+  "Orig_Pleiotropy", "Adj_Pleiotropy",
+  "Orig_Replication", "Adj_Replication"
+)
+for (nm in need_cols) {
+  if (!nm %in% names(tab2final)) tab2final[, (nm) := NA_integer_]
+}
+
+setcolorder(
+  tab2final,
+  c("Method", "Orig_Pleiotropy", "Adj_Pleiotropy", "Orig_Replication", "Adj_Replication")
+)
+
+# optional display order
+method_order <- c("csmGmm", "Kernel", "locfdr50", "locfdr7", "qch_copula", "adaFilter")
+tab2final[, ord := fifelse(Method %in% method_order, match(Method, method_order), 999L)]
+setorder(tab2final, ord, Method)
+tab2final[, ord := NULL]
+
 tab2final
-
 
 #----------------------------------------------------------------------------------------#
 # Table 1
 qval <- 0.1
+
 read_method_lfdr <- function(file_path, lfdr_col, avg_col, rej_col, n_ref, keep_only_col = NULL) {
   if (!file.exists(file_path)) {
     out <- data.frame(tmp = rep(NA_real_, n_ref))
@@ -292,4 +370,88 @@ mergedRej <- allRej %>%
   arrange(desc(numRej)) %>%
   select(RS, Chr, BP, Gene, Z_eqtl, Z_twas, Z_eqtl1, Z_twas1, numRej)
 
+# print(mergedRej)
+
+mergedRej1 <- allRej1 %>%
+  left_join(tab2DF %>% select(SNP, RS), by = "SNP") %>%
+  arrange(desc(numRej)) %>%
+  select(RS, Gene, Z_eqtl, Z_twas, Z_eqtl1, Z_twas1, numRej,
+         avgNew, avgKernel, avgDf7,avgdeib, avgmtest)
+
+mergedRej1 <- mergedRej1 %>% tidyr::drop_na()
+
+
+# ----------------------------------------------------------------------------------------
+# Create all possible pairs of rows
+result <- mergedRej1 %>%
+  # Add row numbers for tracking
+  mutate(row_id = row_number()) %>%
+  # Create all pairs using cross join
+  cross_join(mergedRej1 %>% mutate(row_id = row_number()), 
+             suffix = c("_1", "_2")) %>%
+  # Ensure we only compare each pair once (avoid duplicates and self-comparisons)
+  filter(row_id_1 < row_id_2) %>%
+  # Apply your filtering conditions
+  filter(
+    # Same RS values
+    RS_1 == RS_2 &
+      
+      # Same signs for all Z values between the two rows
+      sign(Z_eqtl_1) == sign(Z_eqtl_2) &
+      sign(Z_eqtl1_1) == sign(Z_eqtl1_2) &
+      sign(Z_twas_1) == sign(Z_twas_2) &
+      sign(Z_twas1_1) == sign(Z_twas1_2) &
+      
+      # Either all abs values from row 1 are larger OR all are smaller than row 2
+      (
+        (abs(Z_eqtl_1) > abs(Z_eqtl_2) & 
+           abs(Z_eqtl1_1) > abs(Z_eqtl1_2) & 
+           abs(Z_twas_1) > abs(Z_twas_2) & 
+           abs(Z_twas1_1) > abs(Z_twas1_2) ) |
+          (abs(Z_eqtl_1) < abs(Z_eqtl_2) & 
+             abs(Z_eqtl1_1) < abs(Z_eqtl1_2) & 
+             abs(Z_twas_1) < abs(Z_twas_2) & 
+             abs(Z_twas1_1) < abs(Z_twas1_2) ) 
+      ) &
+      
+      (
+        (avgKernel_1 < 0.1 & avgKernel_2 > 0.1) | (avgKernel_1 > 0.1 & avgKernel_2 < 0.1) |
+          (avgDf7_1 < 0.1 & avgDf7_2 > 0.1) | (avgDf7_1 > 0.1 & avgDf7_2 < 0.1)
+      ) &
+      
+      (
+        (avgKernel_1 > avgKernel_2 & avgDf7_1 > avgDf7_2 ) |
+          (avgKernel_1 < avgKernel_2 & avgDf7_1 < avgDf7_2 )
+      ) &
+      
+      # Keep the numRej condition if needed (applied to both rows)
+      numRej_1 < 3 & numRej_2 < 3
+  ) %>%
+  # Reshape to show pairs in two separate rows
+  pivot_longer(
+    cols = -c(row_id_1, row_id_2),
+    names_to = c(".value", "pair"),
+    names_pattern = "(.+)_(.)"
+  ) %>%
+  # Round Z_eqtl to 3 decimal places
+  mutate(
+    Z_eqtl = round(Z_eqtl, 2),
+    Z_eqtl1 = round(Z_eqtl1, 2),
+    Z_twas = round(Z_twas, 2),
+    Z_twas1 = round(Z_twas1, 2),
+    # avgNew = round(avgNew, 6),
+    # avgKernel = round(avgKernel, 3),
+    # avgDf7 = round(avgDf7, 3)
+    
+  ) %>%
+  arrange(row_id_1, row_id_2) %>%
+  distinct() %>%
+  select(-c(1:3)) 
+
+
+# Display the final result
+print(result)
+
+# Print the selected genes
 print(mergedRej)
+
